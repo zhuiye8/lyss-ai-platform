@@ -1,0 +1,334 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:16-alpine
+    container_name: lyss_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lyss_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_strong_password_here}
+      POSTGRES_DB: ${POSTGRES_DB:-lyss_db}
+      # 配置PostgreSQL性能参数
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lyss_user} -d ${POSTGRES_DB:-lyss_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: lyss_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./configs/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    sysctls:
+      net.core.somaxconn: 1024
+
+  # Qdrant 向量数据库
+  qdrant:
+    image: qdrant/qdrant:v1.10.1
+    container_name: lyss_qdrant
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./configs/qdrant_config.yaml:/qdrant/config/production.yaml:ro
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - lyss_network
+
+  # 后端服务
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+    container_name: lyss_backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # 数据库配置
+      POSTGRES_USER: ${POSTGRES_USER:-lyss_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_strong_password_here}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-lyss_db}
+      
+      # Redis 配置
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+      
+      # Qdrant 配置
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      
+      # 应用配置
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-here-minimum-32-characters}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      PROJECT_NAME: ${PROJECT_NAME:-LYSS AI Platform}
+      
+      # CORS 配置
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+      
+      # 日志配置
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # 开发模式
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      
+      # 文件上传配置
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10485760}  # 10MB
+      UPLOAD_PATH: ${UPLOAD_PATH:-/app/uploads}
+      
+      # AI 供应商默认配置
+      DEFAULT_MODEL_TEMPERATURE: ${DEFAULT_MODEL_TEMPERATURE:-0.7}
+      DEFAULT_MAX_TOKENS: ${DEFAULT_MAX_TOKENS:-2000}
+      
+      # 安全配置
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_MINUTES: ${REFRESH_TOKEN_EXPIRE_MINUTES:-10080}  # 7 days
+      
+      # 监控配置
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      METRICS_PORT: ${METRICS_PORT:-8001}
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app:cached
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # 前端服务
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_APP_NAME: ${VITE_APP_NAME:-LYSS AI Platform}
+        VITE_ENABLE_PWA: ${VITE_ENABLE_PWA:-true}
+    container_name: lyss_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app:cached
+      - /app/node_modules
+      - frontend_dist:/app/dist
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.3'
+
+  # Nginx 反向代理 (生产环境)
+  nginx:
+    image: nginx:alpine
+    container_name: lyss_nginx
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./configs/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    profiles:
+      - production
+
+  # 监控服务 - Prometheus (可选)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lyss_prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    profiles:
+      - monitoring
+
+  # 监控服务 - Grafana (可选)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lyss_grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    profiles:
+      - monitoring
+
+  # 日志聚合 - Elasticsearch (可选)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: lyss_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    profiles:
+      - logging
+
+  # 日志可视化 - Kibana (可选)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: lyss_kibana
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - lyss_network
+    profiles:
+      - logging
+
+# 网络配置
+networks:
+  lyss_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 数据卷配置
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+  frontend_dist:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
