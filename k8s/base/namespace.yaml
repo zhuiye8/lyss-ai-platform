@@ -1,0 +1,11 @@
+# Kubernetes 命名空间配置
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lyss-ai-platform
+  labels:
+    name: lyss-ai-platform
+    app.kubernetes.io/name: lyss-ai-platform
+    app.kubernetes.io/part-of: lyss-ai-platform
+  annotations:
+    description: "Lyss AI Platform 命名空间"

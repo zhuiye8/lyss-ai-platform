@@ -1,0 +1,140 @@
+# 基础设施服务 - 仅包含数据库、缓存等基础服务
+# 用于本地开发时只启动必要的基础服务，应用服务在本地运行
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15
+    container_name: lyss-postgres-dev
+    environment:
+      POSTGRES_DB: lyss_platform_dev
+      POSTGRES_USER: lyss_dev_user
+      POSTGRES_PASSWORD: lyss_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./sql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+    command: postgres -c log_statement=all -c log_duration=on -c log_min_duration_statement=0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lyss_dev_user -d lyss_platform_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: lyss-redis-dev
+    command: redis-server --appendonly yes --loglevel debug --requirepass lyss_redis_dev_password
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin - 数据库管理工具
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lyss-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@lyss.ai
+      PGADMIN_DEFAULT_PASSWORD: devpassword
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+
+  # Redis Commander - Redis管理工具
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: lyss-redis-commander-dev
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:lyss_redis_dev_password
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+
+  # Prometheus - 监控（可选）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lyss-prometheus-dev
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_dev_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana - 监控面板（可选）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lyss-grafana-dev
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - lyss-dev-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+networks:
+  lyss-dev-network:
+    driver: bridge
+    name: lyss-dev-network
+
+volumes:
+  postgres_dev_data:
+    name: lyss_postgres_dev_data
+  redis_dev_data:
+    name: lyss_redis_dev_data
+  pgadmin_dev_data:
+    name: lyss_pgadmin_dev_data
+  prometheus_dev_data:
+    name: lyss_prometheus_dev_data
+  grafana_dev_data:
+    name: lyss_grafana_dev_data

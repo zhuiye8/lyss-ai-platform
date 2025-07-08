@@ -1,0 +1,111 @@
+# Kubernetes ConfigMap 配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lyss-platform-config
+  namespace: lyss-ai-platform
+  labels:
+    app.kubernetes.io/name: lyss-platform-config
+    app.kubernetes.io/part-of: lyss-ai-platform
+data:
+  # 应用配置
+  ENVIRONMENT: "production"
+  API_PREFIX: "/api/v1"
+  
+  # 数据库配置
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_DATABASE: "lyss_platform"
+  DB_SSL_MODE: "require"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "30"
+  
+  # Redis 配置
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_MAX_CONNECTIONS: "50"
+  
+  # 服务配置
+  EINO_HOST: "eino-service"
+  EINO_PORT: "8080"
+  EINO_TIMEOUT: "30"
+  
+  MEMORY_HOST: "memory-service"
+  MEMORY_PORT: "8001"
+  MEMORY_TIMEOUT: "10"
+  
+  # JWT 配置
+  JWT_ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  
+  # 密码策略
+  PASSWORD_MIN_LENGTH: "8"
+  PASSWORD_REQUIRE_SPECIAL: "true"
+  
+  # 速率限制
+  DEFAULT_RATE_LIMIT: "100"
+  BURST_RATE_LIMIT: "200"
+  
+  # 监控配置
+  PROMETHEUS_PORT: "8000"
+  JAEGER_ENDPOINT: "http://jaeger-collector:14268/api/traces"
+  LOG_LEVEL: "INFO"
+  METRICS_ENABLED: "true"
+  
+  # 记忆服务配置
+  VECTOR_DB_PROVIDER: "redis"
+  EMBEDDING_PROVIDER: "sentence-transformers"
+  EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  MEMORY_RETENTION_DAYS: "365"
+  MAX_MEMORIES_PER_USER: "10000"
+  SIMILARITY_THRESHOLD: "0.7"
+  
+  # EINO 服务配置
+  SERVER_HOST: "0.0.0.0"
+  WORKFLOW_MAX_CONCURRENCY: "100"
+  WORKFLOW_EXECUTION_TIMEOUT: "5m"
+  AI_DEFAULT_PROVIDER: "openai"
+  AI_TIMEOUT: "30s"
+  AI_MAX_RETRIES: "3"
+
+---
+# Redis 配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: lyss-ai-platform
+  labels:
+    app.kubernetes.io/name: redis-config
+    app.kubernetes.io/part-of: lyss-ai-platform
+data:
+  redis.conf: |
+    # Redis 配置文件
+    bind 0.0.0.0
+    port 6379
+    timeout 300
+    keepalive 60
+    
+    # 持久化配置
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    
+    # 内存管理
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # 客户端连接
+    tcp-backlog 511
+    tcp-keepalive 300
+    maxclients 10000
+    
+    # 慢查询日志
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
