@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+*.whl
+pip-wheel-metadata/
+
+# 环境变量和敏感文件
+.env
+*.env
+*.secret
+*.pem
+*.key
+*.crt
+
+# 日志
+*.log
+logs/
+log/
+
+# 测试和覆盖率
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# Docker
+docker-compose.override.yml
+*.dockerignore
+postgres_dev_data/
+redis_dev_data/
+
+# 编辑器和 IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 前端 (Node.js)
+node_modules/
+dist/
+build/
+npm-debug.log*
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# Go (eino-service)
+bin/
+pkg/
+vendor/
+*.exe
+go.sum
+go.mod.bak
+
+# 文档
+docs/_build/
+docs/build/
+
+# 临时文件
+*.tmp
+*.bak
+*.cache
+tmp/
