@@ -4,9 +4,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL 数据库
+  # PostgreSQL 数据库 - 升级到最新版本17.5修复安全漏洞
   postgres:
-    image: postgres:15
+    image: postgres:17.5
     container_name: lyss-postgres-dev
     environment:
       POSTGRES_DB: lyss_platform_dev
@@ -28,9 +28,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis 缓存
+  # Redis 缓存 - 升级到Redis 8获得显著性能提升
   redis:
-    image: redis:7-alpine
+    image: redis:8.0-alpine
     container_name: lyss-redis-dev
     command: redis-server --appendonly yes --loglevel debug --requirepass lyss_redis_dev_password
     volumes:
@@ -46,9 +46,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # PgAdmin - 数据库管理工具
+  # PgAdmin - 数据库管理工具，固定版本确保稳定性
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:8.14
     container_name: lyss-pgadmin-dev
     environment:
       PGADMIN_DEFAULT_EMAIL: dev@lyss.ai
@@ -65,9 +65,9 @@ services:
       - lyss-dev-network
     restart: unless-stopped
 
-  # Redis Commander - Redis管理工具
+  # Redis Commander - Redis管理工具，固定版本确保稳定性
   redis-commander:
-    image: rediscommander/redis-commander:latest
+    image: rediscommander/redis-commander:0.8.1
     container_name: lyss-redis-commander-dev
     environment:
       REDIS_HOSTS: local:redis:6379:0:lyss_redis_dev_password
@@ -80,9 +80,9 @@ services:
       - lyss-dev-network
     restart: unless-stopped
 
-  # Prometheus - 监控（可选）
+  # Prometheus - 监控（可选），固定版本确保稳定性
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.54.1
     container_name: lyss-prometheus-dev
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -102,9 +102,9 @@ services:
     profiles:
       - monitoring
 
-  # Grafana - 监控面板（可选）
+  # Grafana - 监控面板（可选），固定版本确保稳定性
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.3.0
     container_name: lyss-grafana-dev
     environment:
       - GF_SECURITY_ADMIN_USER=admin
