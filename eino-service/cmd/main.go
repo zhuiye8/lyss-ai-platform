@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lyss-ai/platform/eino-service/internal/config"
-	"github.com/lyss-ai/platform/eino-service/internal/handlers"
-	"github.com/lyss-ai/platform/eino-service/internal/middleware"
-	"github.com/lyss-ai/platform/eino-service/internal/services"
-	"github.com/lyss-ai/platform/eino-service/pkg/workflows"
+	"github.com/zhuiye8/lyss-ai-platform/eino-service/internal/config"
+	"github.com/zhuiye8/lyss-ai-platform/eino-service/internal/handlers"
+	"github.com/zhuiye8/lyss-ai-platform/eino-service/internal/middleware"
+	"github.com/zhuiye8/lyss-ai-platform/eino-service/internal/services"
+	"github.com/zhuiye8/lyss-ai-platform/eino-service/pkg/workflows"
 )
 
 func main() {
