@@ -1,0 +1,9 @@
+...
+/usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/04_seed_data.sql
+...
+2025-07-09 02:46:28.857 UTC [68] ERROR:  case not found
+2025-07-09 02:46:28.857 UTC [68] HINT:  CASE statement is missing ELSE part.
+2025-07-09 02:46:28.857 UTC [68] CONTEXT:  PL/pgSQL function validate_tenant_config() line 14 at CASE
+2025-07-09 02:46:28.857 UTC [68] STATEMENT:  INSERT INTO tenants (...) VALUES (...)
+...
+psql:/docker-entrypoint-initdb.d/04_seed_data.sql:52: ERROR:  case not found

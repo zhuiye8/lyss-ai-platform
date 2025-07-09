@@ -1,12 +1,10 @@
 # 基础设施服务 - 仅包含数据库、缓存等基础服务
 # 用于本地开发时只启动必要的基础服务，应用服务在本地运行
 
-version: '3.8'
-
 services:
-  # PostgreSQL 数据库 - 升级到最新版本17.5修复安全漏洞
+  # PostgreSQL 数据库
   postgres:
-    image: postgres:17.5
+    image: pgvector/pgvector:pg16
     container_name: lyss-postgres-dev
     environment:
       POSTGRES_DB: lyss_platform_dev
@@ -65,9 +63,9 @@ services:
       - lyss-dev-network
     restart: unless-stopped
 
-  # Redis Commander - Redis管理工具，固定版本确保稳定性
+  # Redis Commander - Redis管理工具
   redis-commander:
-    image: rediscommander/redis-commander:0.8.1
+    image: rediscommander/redis-commander:latest
     container_name: lyss-redis-commander-dev
     environment:
       REDIS_HOSTS: local:redis:6379:0:lyss_redis_dev_password

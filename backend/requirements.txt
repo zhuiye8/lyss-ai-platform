@@ -14,7 +14,7 @@ redis==6.2.0
 hiredis==3.1.0
 
 # Authentication & Security - 修复CVE-2024-33663算法混淆漏洞
-python-jose[cryptography]==3.3.1
+python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.12
 pydantic==2.10.3
@@ -26,7 +26,7 @@ aiohttp==3.11.10
 
 # Monitoring & Logging - 更新到最新版本
 prometheus-client==0.21.1
-structlog==24.6.0
+structlog==25.1.0
 opentelemetry-api==1.33.0
 opentelemetry-sdk==1.33.0
 opentelemetry-exporter-otlp==1.33.0  # 替换弃用的jaeger导出器
