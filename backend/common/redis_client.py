@@ -28,10 +28,10 @@ class RedisManager:
         
         try:
             self.connection_pool = redis.ConnectionPool.from_url(
-                settings.redis.url,
-                max_connections=settings.redis.max_connections,
-                socket_timeout=settings.redis.socket_timeout,
-                socket_connect_timeout=settings.redis.socket_connect_timeout,
+                settings.redis_url,
+                max_connections=settings.redis_max_connections,
+                socket_timeout=settings.redis_socket_timeout,
+                socket_connect_timeout=settings.redis_socket_connect_timeout,
                 decode_responses=True
             )
             

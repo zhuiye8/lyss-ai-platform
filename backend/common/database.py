@@ -14,23 +14,36 @@ from .config import get_settings
 settings = get_settings()
 
 # Create async engine
-async_engine = create_async_engine(
-    settings.database.url,
-    pool_size=settings.database.pool_size,
-    max_overflow=settings.database.max_overflow,
-    pool_timeout=settings.database.pool_timeout,
-    echo=settings.debug,
-    poolclass=StaticPool if settings.is_development else None
-)
+if settings.is_development:
+    async_engine = create_async_engine(
+        settings.database_url,
+        echo=settings.debug,
+        poolclass=StaticPool
+    )
+else:
+    async_engine = create_async_engine(
+        settings.database_url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        echo=settings.debug
+    )
 
 # Create sync engine for migrations
-sync_engine = create_engine(
-    settings.database.sync_url,
-    pool_size=settings.database.pool_size,
-    max_overflow=settings.database.max_overflow,
-    pool_timeout=settings.database.pool_timeout,
-    echo=settings.debug
-)
+if settings.is_development:
+    sync_engine = create_engine(
+        settings.database_sync_url,
+        echo=settings.debug,
+        poolclass=StaticPool
+    )
+else:
+    sync_engine = create_engine(
+        settings.database_sync_url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        echo=settings.debug
+    )
 
 # Session makers
 AsyncSessionLocal = async_sessionmaker(

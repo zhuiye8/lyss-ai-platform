@@ -19,45 +19,57 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class Role(str, Enum):
-    """User roles"""
+    """用户角色枚举"""
     SUPER_ADMIN = "super_admin"
     TENANT_ADMIN = "tenant_admin"
     END_USER = "end_user"
 
 
 class Permission(str, Enum):
-    """System permissions"""
-    # User management
+    """系统权限枚举"""
+    # 用户管理
     USER_CREATE = "user:create"
     USER_READ = "user:read"
     USER_UPDATE = "user:update"
     USER_DELETE = "user:delete"
     
-    # Tenant management
+    # 租户管理
     TENANT_CREATE = "tenant:create"
     TENANT_READ = "tenant:read"
     TENANT_UPDATE = "tenant:update"
     TENANT_DELETE = "tenant:delete"
     
-    # Conversation management
+    # 对话管理
     CONVERSATION_CREATE = "conversation:create"
     CONVERSATION_READ = "conversation:read"
     CONVERSATION_UPDATE = "conversation:update"
     CONVERSATION_DELETE = "conversation:delete"
     
-    # AI model management
+    # AI模型管理
     AI_MODEL_CREATE = "ai_model:create"
     AI_MODEL_READ = "ai_model:read"
     AI_MODEL_UPDATE = "ai_model:update"
     AI_MODEL_DELETE = "ai_model:delete"
     
-    # System administration
+    # AI凭证管理
+    AI_CREDENTIAL_CREATE = "ai_credential:create"
+    AI_CREDENTIAL_READ = "ai_credential:read"
+    AI_CREDENTIAL_UPDATE = "ai_credential:update"
+    AI_CREDENTIAL_DELETE = "ai_credential:delete"
+    
+    # API密钥管理
+    API_KEY_CREATE = "api_key:create"
+    API_KEY_READ = "api_key:read"
+    API_KEY_UPDATE = "api_key:update"
+    API_KEY_DELETE = "api_key:delete"
+    
+    # 系统管理
     SYSTEM_CONFIG = "system:config"
     SYSTEM_MONITORING = "system:monitoring"
     SYSTEM_AUDIT = "system:audit"
 
 
-# Role-based permissions mapping
+# 基于角色的权限映射
 ROLE_PERMISSIONS = {
     Role.SUPER_ADMIN: [p.value for p in Permission],
     Role.TENANT_ADMIN: [
@@ -72,6 +84,14 @@ ROLE_PERMISSIONS = {
         Permission.AI_MODEL_READ.value,
         Permission.AI_MODEL_UPDATE.value,
         Permission.AI_MODEL_DELETE.value,
+        Permission.AI_CREDENTIAL_CREATE.value,
+        Permission.AI_CREDENTIAL_READ.value,
+        Permission.AI_CREDENTIAL_UPDATE.value,
+        Permission.AI_CREDENTIAL_DELETE.value,
+        Permission.API_KEY_CREATE.value,
+        Permission.API_KEY_READ.value,
+        Permission.API_KEY_UPDATE.value,
+        Permission.API_KEY_DELETE.value,
         Permission.SYSTEM_MONITORING.value,
         Permission.SYSTEM_AUDIT.value,
     ],
@@ -83,12 +103,16 @@ ROLE_PERMISSIONS = {
         Permission.CONVERSATION_UPDATE.value,
         Permission.CONVERSATION_DELETE.value,
         Permission.AI_MODEL_READ.value,
+        Permission.API_KEY_CREATE.value,
+        Permission.API_KEY_READ.value,
+        Permission.API_KEY_UPDATE.value,
+        Permission.API_KEY_DELETE.value,
     ]
 }
 
 
 class TokenData(BaseModel):
-    """Token payload data"""
+    """令牌载荷数据"""
     user_id: str
     tenant_id: str
     email: str
@@ -96,42 +120,44 @@ class TokenData(BaseModel):
     permissions: List[str]
     exp: datetime
     iat: datetime
-    jti: str  # JWT ID for token revocation
+    jti: str  # JWT ID，用于令牌撤销
 
 
 class PasswordPolicy:
-    """Password policy validator"""
+    """密码策略验证器"""
     
     @staticmethod
     def validate_password(password: str) -> tuple[bool, List[str]]:
-        """Validate password against policy"""
+        """验证密码是否符合策略要求"""
         errors = []
         
         if len(password) < settings.security.password_min_length:
-            errors.append(f"Password must be at least {settings.security.password_min_length} characters long")
+            errors.append(f"密码长度至少需要 {settings.security.password_min_length} 个字符")
         
         if not any(c.isupper() for c in password):
-            errors.append("Password must contain at least one uppercase letter")
+            errors.append("密码必须包含至少一个大写字母")
         
         if not any(c.islower() for c in password):
-            errors.append("Password must contain at least one lowercase letter")
+            errors.append("密码必须包含至少一个小写字母")
         
         if not any(c.isdigit() for c in password):
-            errors.append("Password must contain at least one digit")
+            errors.append("密码必须包含至少一个数字")
         
         if settings.security.password_require_special:
             special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
             if not any(c in special_chars for c in password):
-                errors.append("Password must contain at least one special character")
+                errors.append("密码必须包含至少一个特殊字符")
         
         return len(errors) == 0, errors
 
 
 class SecurityManager:
-    """Security utilities manager"""
+    """安全工具管理器"""
     
     def __init__(self):
         self.password_policy = PasswordPolicy()
+        # 将权限映射暴露为实例属性，方便其他模块访问
+        self.ROLE_PERMISSIONS = ROLE_PERMISSIONS
     
     def hash_password(self, password: str) -> str:
         """Hash password"""
@@ -157,7 +183,7 @@ class SecurityManager:
                            roles: List[str], additional_claims: Optional[Dict[str, Any]] = None) -> str:
         """Create access token"""
         now = datetime.utcnow()
-        expire = now + timedelta(minutes=settings.security.access_token_expire_minutes)
+        expire = now + timedelta(minutes=settings.access_token_expire_minutes)
         
         # Get permissions for roles
         permissions = set()
@@ -180,12 +206,12 @@ class SecurityManager:
         if additional_claims:
             payload.update(additional_claims)
         
-        return jwt.encode(payload, settings.security.secret_key, algorithm=settings.security.algorithm)
+        return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     
     def create_refresh_token(self, user_id: str, tenant_id: str) -> str:
         """Create refresh token"""
         now = datetime.utcnow()
-        expire = now + timedelta(days=settings.security.refresh_token_expire_days)
+        expire = now + timedelta(days=settings.refresh_token_expire_days)
         
         payload = {
             "user_id": user_id,
@@ -196,12 +222,12 @@ class SecurityManager:
             "type": "refresh"
         }
         
-        return jwt.encode(payload, settings.security.secret_key, algorithm=settings.security.algorithm)
+        return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     
     def verify_token(self, token: str) -> Optional[TokenData]:
         """Verify and decode token"""
         try:
-            payload = jwt.decode(token, settings.security.secret_key, algorithms=[settings.security.algorithm])
+            payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
             
             # Check if token is expired
             exp = datetime.fromtimestamp(payload.get("exp", 0))

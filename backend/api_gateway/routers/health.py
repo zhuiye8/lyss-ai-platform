@@ -6,9 +6,9 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...common.database import get_async_session, db_manager
-from ...common.redis_client import redis_manager
-from ...common.config import get_settings
+from common.database import get_async_session, db_manager
+from common.redis_client import redis_manager
+from common.config import get_settings
 
 router = APIRouter()
 settings = get_settings()
@@ -52,7 +52,7 @@ async def check_external_services() -> Dict[str, Any]:
     try:
         import httpx
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{settings.eino.url}/health", timeout=5.0)
+            response = await client.get(f"{settings.eino_url}/health", timeout=5.0)
             services["eino_service"] = {
                 "status": "healthy" if response.status_code == 200 else "unhealthy",
                 "details": f"HTTP {response.status_code}"
@@ -67,7 +67,7 @@ async def check_external_services() -> Dict[str, Any]:
     try:
         import httpx
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{settings.memory.url}/health", timeout=5.0)
+            response = await client.get(f"{settings.memory_url}/health", timeout=5.0)
             services["memory_service"] = {
                 "status": "healthy" if response.status_code == 200 else "unhealthy",
                 "details": f"HTTP {response.status_code}"

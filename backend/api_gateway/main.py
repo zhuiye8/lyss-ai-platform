@@ -14,14 +14,14 @@ import uvicorn
 from common.config import get_settings
 from common.database import init_database, close_database
 from common.redis_client import init_redis, close_redis
-from .middleware import (
-    LoggingMiddleware,
+from api_gateway.middleware.auth import (
     AuthenticationMiddleware,
     RateLimitMiddleware,
-    TenantMiddleware
+    CORSMiddleware as CustomCORSMiddleware,
+    AuditLogMiddleware
 )
-from .routers import auth, conversations, admin, health, metrics
-from .monitoring import setup_monitoring
+from api_gateway.routers import health
+from api_gateway.routers.auth import router as auth_router
 
 
 settings = get_settings()
@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
     # Initialize Redis
     await init_redis()
     
-    # Setup monitoring
-    setup_monitoring(app)
+    # Setup monitoring (TODO: 实现监控配置)
+    # setup_monitoring(app)
     
     print("API Gateway started successfully!")
     
@@ -72,7 +72,7 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,21 +84,19 @@ app.add_middleware(
 )
 
 # Custom middleware
-app.add_middleware(LoggingMiddleware)
+app.add_middleware(AuditLogMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.default_rate_limit)
 app.add_middleware(AuthenticationMiddleware)
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(TenantMiddleware)
 
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
-app.include_router(auth.router, prefix=f"{settings.api_prefix}/auth", tags=["Authentication"])
-app.include_router(conversations.router, prefix=f"{settings.api_prefix}/conversations", tags=["Conversations"])
-app.include_router(admin.router, prefix=f"{settings.api_prefix}/admin", tags=["Administration"])
+app.include_router(auth_router, prefix=f"{settings.api_prefix}/auth", tags=["Authentication"])
 
 # Metrics endpoint
 @app.get("/metrics")
 async def get_metrics():
     """Prometheus metrics endpoint"""
+    from starlette.responses import Response
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -106,6 +104,7 @@ async def get_metrics():
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTP exceptions"""
+    from datetime import datetime
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -127,6 +126,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle general exceptions"""
     import traceback
+    from datetime import datetime
     
     # Log the error
     print(f"Unhandled exception: {exc}")

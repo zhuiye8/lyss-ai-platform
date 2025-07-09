@@ -9,15 +9,15 @@ env/
 pip-wheel-metadata/
 
 # 环境变量和敏感文件
-.env
-*.env
-*.secret
-*.pem
-*.key
-*.crt
+# .env
+# *.env
+# *.secret
+# *.pem
+# *.key
+# *.crt
 
 # 日志
-*.log
+# *.log
 logs/
 log/
 

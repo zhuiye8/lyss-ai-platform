@@ -90,35 +90,67 @@ git clone https://github.com/your-org/lyss-ai-platform.git
 cd lyss-ai-platform
 ```
 
-2. **运行设置脚本**
+2. **安装Python依赖**
 ```bash
-chmod +x scripts/setup-dev.sh
-./scripts/setup-dev.sh
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或 venv\Scripts\activate  # Windows
+
+# 安装后端依赖
+cd backend
+pip install -r requirements.txt
+cd ..
+
+# 安装记忆服务依赖
+cd memory-service
+pip install -r requirements.txt
+cd ..
 ```
 
-3. **启动基础服务**
+3. **安装前端依赖**
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+4. **安装Go依赖**
+```bash
+cd eino-service
+go mod download
+cd ..
+```
+
+5. **启动基础服务**
 ```bash
 # 启动数据库和Redis
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+docker-compose up -d postgres redis
+
+# 等待数据库启动完成
+sleep 10
+
+# 初始化数据库（可选）
+# psql -h localhost -U lyss_dev_user -d lyss_platform_dev -f sql/init.sql
 ```
 
-4. **启动开发服务**
+6. **启动开发服务**
 
 在不同终端窗口中运行：
 
 ```bash
 # 终端1: 启动API网关
 cd backend
-source ../venv/bin/activate
-python -m uvicorn api-gateway.main:app --host 0.0.0.0 --port 8000 --reload
+source venv/bin/activate
+python start_server.py
 
 # 终端2: 启动EINO服务
 cd eino-service
-go run cmd/main.go
+go run cmd/server/main.go
 
 # 终端3: 启动记忆服务
 cd memory-service
-source ../venv/bin/activate
+source venv/bin/activate
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
 # 终端4: 启动前端
@@ -128,27 +160,67 @@ npm run dev
 
 ### 访问应用
 
-- **前端应用**: http://localhost:3000
+- **前端应用**: http://localhost:5173 (Vite开发服务器)
 - **API文档**: http://localhost:8000/docs
-- **PgAdmin**: http://localhost:5050 (admin@lyss.ai / admin)
-- **Redis Commander**: http://localhost:8081
+- **API健康检查**: http://localhost:8000/health
+- **EINO服务**: http://localhost:8080
+- **记忆服务**: http://localhost:8001
 
-### 默认账户
+### 开发环境配置
 
-- **管理员**: admin@lyss.ai / admin123
-- **演示管理**: demo@example.com / admin123
-- **普通用户**: user@example.com / admin123
+项目使用统一的 `.env` 文件进行配置，主要配置项：
+
+```bash
+# 应用配置
+SECRET_KEY=dev-secret-key-not-for-production-32chars
+ENVIRONMENT=development
+DEBUG=true
+
+# 数据库配置
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=lyss_dev_user
+DB_PASSWORD=lyss_dev_password
+DB_DATABASE=lyss_platform_dev
+
+# Redis配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=lyss_redis_dev_password
+
+# AI服务配置
+OPENAI_API_KEY=your-openai-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key
+```
+
+### 故障排除
+
+**后端启动失败**：
+- 检查Python虚拟环境是否激活
+- 确认数据库服务正在运行
+- 检查 `.env` 文件配置是否正确
+
+**前端启动失败**：
+- 确认Node.js版本 >= 18.0.0
+- 删除 `node_modules` 重新安装
+- 检查端口5173是否被占用
+
+**数据库连接失败**：
+- 确认Docker容器正在运行：`docker ps`
+- 检查数据库配置和凭据
+- 查看Docker日志：`docker logs <container_id>`
 
 ## 📁 项目结构
 
 ```
 lyss-ai-platform/
 ├── backend/                    # 后端服务
-│   ├── api-gateway/           # API网关服务
+│   ├── api_gateway/           # API网关服务
 │   ├── tenant-service/        # 租户管理服务
-│   ├── memory-service/        # 记忆服务代理
 │   ├── common/                # 共享代码
-│   └── tests/                 # 后端测试
+│   ├── tests/                 # 后端测试
+│   ├── start_server.py        # 后端启动脚本
+│   └── requirements.txt       # Python依赖
 ├── frontend/                   # 前端应用
 │   ├── src/
 │   │   ├── components/        # React组件
@@ -194,11 +266,7 @@ lyss-ai-platform/
 
 ### 环境变量
 
-复制 `.env.example` 为 `.env` 并修改相应配置：
-
-```bash
-cp .env.example .env
-```
+项目使用统一的 `.env` 文件进行配置，所有服务共享同一个配置文件。
 
 主要配置项：
 
@@ -207,6 +275,10 @@ cp .env.example .env
 - `REDIS_*`: Redis连接配置
 - `OPENAI_API_KEY`: OpenAI API密钥
 - `ANTHROPIC_API_KEY`: Anthropic API密钥
+- `EINO_*`: EINO服务配置
+- `MEMORY_*`: 记忆服务配置
+
+**注意**: 所有服务都会从项目根目录的 `.env` 文件读取配置。
 
 ### AI服务配置
 
