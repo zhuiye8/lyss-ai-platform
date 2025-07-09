@@ -22,6 +22,8 @@ from api_gateway.middleware.auth import (
 )
 from api_gateway.routers import health
 from api_gateway.routers.auth import router as auth_router
+from api_gateway.routers.conversations import router as conversations_router
+from api_gateway.routers.ai_chat import router as ai_chat_router
 
 
 settings = get_settings()
@@ -91,6 +93,8 @@ app.add_middleware(AuthenticationMiddleware)
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(auth_router, prefix=f"{settings.api_prefix}/auth", tags=["Authentication"])
+app.include_router(conversations_router, prefix=f"{settings.api_prefix}", tags=["Conversations"])
+app.include_router(ai_chat_router, prefix=f"{settings.api_prefix}/ai", tags=["AI Chat"])
 
 # Metrics endpoint
 @app.get("/metrics")

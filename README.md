@@ -3,6 +3,24 @@
 ![Lyss AI Platform](https://img.shields.io/badge/Lyss%20AI-Platform-blue?style=for-the-badge)
 ![Version](https://img.shields.io/badge/version-1.0.0-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge)
+![Progress](https://img.shields.io/badge/项目进度-90%25-brightgreen?style=for-the-badge)
+
+## 🚨 重要提醒 - 项目状态更新 (2025-07-09)
+
+**当前项目状态**: 第一阶段核心功能开发已完成90%，准备进入第二阶段增强功能开发
+
+**如果你是继续开发的Claude AI Assistant**: 
+📖 **请务必先阅读 [`项目开发状态总结.md`](./项目开发状态总结.md) 文件**，获取完整的项目开发状态和上下文信息
+
+### 最新完成功能 (2025-07-09)
+- ✅ **后端核心功能 (100%)**：认证授权、对话管理、AI服务集成
+- ✅ **前端基础界面 (70%)**：React应用、用户界面、对话管理
+- ✅ **技术架构优化**：微服务架构、数据库设计、缓存系统
+
+### 下一步工作重点
+1. 🔄 **Memory服务完善** - 基于Mem0AI的记忆系统
+2. 🔄 **EINO工作流服务** - Go语言工作流编排
+3. 🔄 **管理后台功能** - 系统管理和监控界面
 
 ## 🌟 项目概述
 
