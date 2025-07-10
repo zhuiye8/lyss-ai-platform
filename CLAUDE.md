@@ -2,28 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 重要提醒 - 项目状态更新 (2025-07-09)
+## 🚨 重要提醒 - 项目状态更新 (2025-07-10)
 
-**当前项目状态**: 第一阶段核心功能开发已完成90%，准备进入第二阶段
-**如果你是继续开发的Claude**: 请务必先阅读 `项目开发状态总结.md` 文件，获取完整的项目开发状态和上下文信息
+**当前项目状态**: 项目初始化完成，准备开始第一个微服务开发
+**如果你是继续开发的Claude**: 请务必先阅读 `DEVELOPMENT_PRIORITY.md` 文件，了解当前开发优先级和任务
 
-### 第一阶段已完成功能
-- ✅ **后端核心功能 (85% → 100%)**
-  - 完整的认证授权系统（JWT + RBAC）
-  - 对话管理系统（CRUD + 搜索 + 分页）
-  - AI服务集成层（OpenAI + Anthropic + 流式响应）
-  - 基础设施优化（数据库 + Redis + 中间件）
+### 已完成的基础工作
+- ✅ **项目架构设计和文档 (100%)**
+  - 完整的微服务规范文档
+  - 开发规范和项目结构定义
+  - API设计和数据库设计文档
 
-- ✅ **前端基础界面 (5% → 70%)**
-  - React + TypeScript + Ant Design架构
-  - 用户登录和主布局系统
-  - 仪表盘和对话管理界面
-  - 响应式设计和状态管理
+- ✅ **基础设施配置 (100%)**
+  - Docker Compose 基础设施服务配置
+  - PostgreSQL + Redis + Qdrant + MinIO 
+  - 数据库初始化脚本和测试数据
+  - 环境变量配置模板
+
+- ⏳ **微服务代码开发 (0%)**
+  - 所有6个微服务都是空目录，等待开发
+  - 按照 DEVELOPMENT_PRIORITY.md 的优先级依次开发
 
 ### 下一步工作重点
-1. **Memory服务完善** (优先级: HIGH)
-2. **EINO工作流服务** (优先级: HIGH)
-3. **管理后台功能** (优先级: MEDIUM)
+1. **Auth Service (认证服务)** (优先级: 最高) - 下一个开发目标
+2. **Tenant Service (租户服务)** (优先级: 最高) 
+3. **Backend API Gateway** (优先级: 高)
 
 ### 核心开发要求
 1. **全程使用中文注释和回复**
@@ -42,10 +45,12 @@ Lyss是一个企业级AI服务聚合与管理平台，采用微服务架构，�
 ## 架构组件
 
 ### 微服务架构
-- **backend/** - FastAPI主API网关服务，包含完整的认证、租户管理、权限控制系统 ✅
-- **frontend/** - React + TypeScript + Ant Design前端应用，基础界面已完成 ✅
-- **eino-service/** - 字节跳动EINO框架的Go服务，负责AI工作流编排（待开发）
-- **memory-service/** - FastAPI + Mem0AI记忆服务，处理对话记忆和上下文（待开发）
+- **backend/** - FastAPI主API网关服务，统一入口和路由分发 (待开发)
+- **auth-service/** - FastAPI认证服务，JWT令牌管理和用户验证 (待开发)
+- **tenant-service/** - FastAPI租户服务，用户管理和供应商凭证管理 (待开发)
+- **frontend/** - React + TypeScript + Ant Design前端应用 (待开发)
+- **eino-service/** - Go + EINO框架，AI工作流编排服务 (待开发)
+- **memory-service/** - FastAPI + Mem0AI记忆服务，对话记忆和上下文管理 (待开发)
 
 ### 数据层
 - **PostgreSQL** - 混合多租户模型：敏感数据独立数据库，大容量数据通过tenant_id隔离
@@ -176,3 +181,9 @@ cd frontend && npm run type-check
 - 工作流定义在eino-service/internal/workflows/
 - 使用compose.Graph进行图编排
 - 支持OptimizedRAG、SimpleChat、ToolCalling等预定义工作流
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
