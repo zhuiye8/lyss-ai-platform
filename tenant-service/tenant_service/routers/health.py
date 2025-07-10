@@ -28,16 +28,26 @@ async def health_check(db: AsyncSession = Depends(get_db)) -> HealthCheckRespons
     
     # 检查数据库连接
     try:
-        await db.execute("SELECT 1")
-        dependencies["database"] = "healthy"
-    except Exception:
+        from sqlalchemy import text
+        result = await db.execute(text("SELECT 1"))
+        value = result.scalar()
+        if value == 1:
+            dependencies["database"] = "healthy"
+        else:
+            dependencies["database"] = "unhealthy"
+    except Exception as e:
         dependencies["database"] = "unhealthy"
     
     # 检查pgcrypto扩展
     try:
-        await db.execute("SELECT pgp_sym_encrypt('test', 'test_key')")
-        dependencies["pgcrypto"] = "healthy"
-    except Exception:
+        from sqlalchemy import text
+        result = await db.execute(text("SELECT pgp_sym_encrypt('test', 'test_key')"))
+        crypto_result = result.scalar()
+        if crypto_result:
+            dependencies["pgcrypto"] = "healthy"
+        else:
+            dependencies["pgcrypto"] = "unhealthy"
+    except Exception as e:
         dependencies["pgcrypto"] = "unhealthy"
     
     # 判断总体状态

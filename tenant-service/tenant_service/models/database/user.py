@@ -112,22 +112,18 @@ class User(TenantAwareModel):
         Index("idx_users_active", "is_active"),
     )
     
-    # 关系定义
+    # 租户关系（使用字符串引用避免循环导入）
     tenant: Mapped["Tenant"] = relationship(
         "Tenant",
-        back_populates="users"
+        back_populates="users",
+        lazy="select"
     )
     
+    # 角色关系
     role: Mapped["Role"] = relationship(
         "Role",
-        back_populates="users"
-    )
-    
-    preferences: Mapped[Optional["UserPreference"]] = relationship(
-        "UserPreference",
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan"
+        back_populates="users",
+        lazy="select"
     )
     
     @property

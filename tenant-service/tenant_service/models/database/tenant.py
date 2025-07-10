@@ -7,6 +7,7 @@
 
 from typing import Any, Dict
 from sqlalchemy import String, Integer, CheckConstraint, Index
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
@@ -58,6 +59,7 @@ class Tenant(BaseModel):
     
     # 租户设置（JSON格式）
     settings: Mapped[Dict[str, Any]] = mapped_column(
+        JSONB,
         default=dict,
         nullable=False,
         comment="租户设置"
@@ -73,23 +75,20 @@ class Tenant(BaseModel):
         Index("idx_tenants_status", "status"),
     )
     
-    # 关系定义
+    # 用户关系（使用字符串引用避免循环导入）
     users: Mapped[list["User"]] = relationship(
-        "User",
+        "User", 
         back_populates="tenant",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="select"
     )
     
+    # 供应商凭证关系
     supplier_credentials: Mapped[list["SupplierCredential"]] = relationship(
         "SupplierCredential",
         back_populates="tenant",
-        cascade="all, delete-orphan"
-    )
-    
-    tool_configs: Mapped[list["TenantToolConfig"]] = relationship(
-        "TenantToolConfig",
-        back_populates="tenant",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="select"
     )
     
     def __repr__(self) -> str:

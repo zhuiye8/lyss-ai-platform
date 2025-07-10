@@ -2,10 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 重要提醒 - 项目状态更新 (2025-07-10)
+## 🚨 重要提醒 - 项目状态更新 (2025-07-11)
 
-**当前项目状态**: 项目初始化完成，准备开始第一个微服务开发
-**如果你是继续开发的Claude**: 请务必先阅读 `DEVELOPMENT_PRIORITY.md` 文件，了解当前开发优先级和任务
+**当前项目状态**: Auth Service + Tenant Service 已完成，准备开发 Backend API Gateway
+**如果你是继续开发的Claude**: 
+1. 请务必先阅读 `READ_ME_FIRST.md` 文件，获取完整的项目状态和技术细节
+2. 然后阅读 `DEVELOPMENT_PRIORITY.md` 文件，了解当前开发优先级
 
 ### 已完成的基础工作
 - ✅ **项目架构设计和文档 (100%)**
@@ -19,14 +21,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 数据库初始化脚本和测试数据
   - 环境变量配置模板
 
-- ⏳ **微服务代码开发 (0%)**
-  - 所有6个微服务都是空目录，等待开发
-  - 按照 DEVELOPMENT_PRIORITY.md 的优先级依次开发
+- ✅ **Auth Service - 认证服务 (100%)** (2025-07-10)
+  - JWT认证机制，Redis集成，健康检查
+  - 与Tenant Service集成调用
+  - 完整错误处理和中文日志
+
+- ✅ **Tenant Service - 租户服务 (100%)** (2025-07-11)
+  - 租户管理、用户管理、供应商凭证管理
+  - pgcrypto加密存储，多租户数据隔离
+  - SQLAlchemy关系映射完整修复
+  - 内部服务接口为Auth Service提供用户验证
 
 ### 下一步工作重点
-1. **Auth Service (认证服务)** (优先级: 最高) - 下一个开发目标
-2. **Tenant Service (租户服务)** (优先级: 最高) 
-3. **Backend API Gateway** (优先级: 高)
+1. **Backend API Gateway** (优先级: 高) - 下一个开发目标
+2. **Frontend (前端应用)** (优先级: 高)
+3. **EINO Service + Memory Service** (优先级: 中)
 
 ### 核心开发要求
 1. **全程使用中文注释和回复**
@@ -46,8 +55,8 @@ Lyss是一个企业级AI服务聚合与管理平台，采用微服务架构，�
 
 ### 微服务架构
 - **backend/** - FastAPI主API网关服务，统一入口和路由分发 (待开发)
-- **auth-service/** - FastAPI认证服务，JWT令牌管理和用户验证 (待开发)
-- **tenant-service/** - FastAPI租户服务，用户管理和供应商凭证管理 (待开发)
+- **auth-service/** - FastAPI认证服务，JWT令牌管理和用户验证 (✅ 已完成)
+- **tenant-service/** - FastAPI租户服务，用户管理和供应商凭证管理 (✅ 已完成)
 - **frontend/** - React + TypeScript + Ant Design前端应用 (待开发)
 - **eino-service/** - Go + EINO框架，AI工作流编排服务 (待开发)
 - **memory-service/** - FastAPI + Mem0AI记忆服务，对话记忆和上下文管理 (待开发)

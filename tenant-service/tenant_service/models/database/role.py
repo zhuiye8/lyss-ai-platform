@@ -7,6 +7,7 @@
 
 from typing import Any, Dict, List
 from sqlalchemy import String, Boolean, Text, Index
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
@@ -41,6 +42,7 @@ class Role(BaseModel):
     
     # 权限列表（JSON格式）
     permissions: Mapped[List[str]] = mapped_column(
+        JSONB,
         default=list,
         nullable=False,
         comment="权限列表"
@@ -60,10 +62,11 @@ class Role(BaseModel):
         Index("idx_roles_system", "is_system_role"),
     )
     
-    # 关系定义
+    # 用户关系（使用字符串引用避免循环导入）
     users: Mapped[list["User"]] = relationship(
         "User",
-        back_populates="role"
+        back_populates="role",
+        lazy="select"
     )
     
     def __repr__(self) -> str:

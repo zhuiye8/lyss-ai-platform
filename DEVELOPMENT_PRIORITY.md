@@ -1,10 +1,10 @@
 # Lyss AI Platform 微服务开发优先级
 
-## 📅 当前开发状态 (2025-07-10)
+## 📅 当前开发状态 (2025-07-11)
 
-**当前正在开发**: Auth Service 已完成，准备开发 Tenant Service  
+**当前正在开发**: Auth Service + Tenant Service 已完成，准备开发 Backend API Gateway  
 **项目阶段**: 第一阶段 - 核心功能开发  
-**完成度**: 基础设施和文档 100%，Auth Service 100%，其他业务代码 0%
+**完成度**: 基础设施和文档 100%，Auth Service 100%，Tenant Service 100%，其他业务代码 0%
 
 ---
 
@@ -21,11 +21,12 @@
 - **完成时间**: 2025-07-10
 
 #### 2. **Tenant Service (租户服务)** 👥  
-- **状态**: ⏳ 待开发
+- **状态**: ✅ 已完成
 - **重要性**: 🔴 最高优先级
 - **原因**: 管理用户数据和供应商凭证，Auth Service 需要调用此服务
 - **技术栈**: Python + FastAPI + PostgreSQL + pgcrypto
 - **端口**: 8002
+- **完成时间**: 2025-07-11
 
 ### 第二优先级 (核心功能)
 
@@ -63,10 +64,10 @@
 
 ## 📋 当前开发任务
 
-### 🎯 下一个开发目标: Tenant Service
+### 🎯 下一个开发目标: Backend API Gateway
 
 #### 开发前必读文档
-1. `docs/tenant_service.md` - 租户服务完整规范  
+1. `docs/api_gateway.md` - API网关服务完整规范  
 2. `docs/STANDARDS.md` - 开发规范总纲
 3. `docs/PROJECT_STRUCTURE.md` - 项目目录结构规范
 4. `CLAUDE.md` - Claude开发助手指令
@@ -74,29 +75,29 @@
 
 #### 开发要求
 - ✅ **使用中文注释和回复**
-- ✅ **严格遵循多租户数据隔离**
-- ✅ **实现租户和用户管理**
-- ✅ **pgcrypto加密存储供应商凭证**
-- ✅ **为Auth Service提供用户验证接口**
-- ✅ **完整的错误处理和日志记录**
+- ✅ **实现统一API入口和路由分发**
+- ✅ **集成Auth Service进行认证**
+- ✅ **服务间调用管理**
+- ✅ **统一错误处理和响应格式**
+- ✅ **完整的日志记录和请求追踪**
 - ✅ **健康检查接口**
 
 #### 核心功能清单
-- [ ] 租户管理 (`/admin/tenants`)
-- [ ] 用户管理 (`/admin/users`) 
-- [ ] 供应商凭证管理 (`/admin/suppliers`)
-- [ ] 工具配置管理 (`/admin/tool-configs`)
-- [ ] 用户偏好管理 (`/admin/users/{id}/preferences`)
-- [ ] 内部用户验证接口 (`/internal/users/verify`)
-- [ ] 内部工具配置接口 (`/internal/tool-configs`)
-- [ ] 健康检查 (`/health`)
+- [ ] 统一认证中间件
+- [ ] 路由转发到各微服务
+- [ ] 请求响应日志记录
+- [ ] 错误处理和响应标准化
+- [ ] CORS和安全头配置
+- [ ] 健康检查聚合
+- [ ] 服务发现和负载均衡
+- [ ] API文档聚合
 
 #### 技术要点
-- PostgreSQL数据库操作
-- pgcrypto加密存储
-- 多租户数据隔离
-- RBAC权限控制
-- 审计日志记录
+- FastAPI路由分发
+- HTTP客户端调用微服务
+- JWT认证集成
+- 中间件链设计
+- 错误处理统一化
 
 ---
 
@@ -130,8 +131,8 @@
 | 服务名称 | 状态 | 开始时间 | 完成时间 | 负责人 | 备注 |
 |---------|------|----------|----------|---------|------|
 | Auth Service | ✅ 已完成 | 2025-07-10 | 2025-07-10 | Claude | 包含JWT认证、Redis集成、健康检查 |
-| Tenant Service | ⏳ 待开发 | - | - | - | 下一个开发目标 |
-| Backend API Gateway | ⏳ 待开发 | - | - | - | - |
+| Tenant Service | ✅ 已完成 | 2025-07-11 | 2025-07-11 | Claude | 完整规范实现：用户管理、供应商凭证、pgcrypto加密 |
+| Backend API Gateway | ⏳ 待开发 | - | - | - | 下一个开发目标 |
 | Frontend | ⏳ 待开发 | - | - | - | - |
 | EINO Service | ⏳ 待开发 | - | - | - | - |
 | Memory Service | ⏳ 待开发 | - | - | - | - |
