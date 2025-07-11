@@ -88,6 +88,7 @@ class Settings(BaseSettings):
 
 # 全局配置实例
 settings = Settings()
+print(f"Tenant Service 配置加载成功: {settings.db_host} {settings.db_port} {settings.db_database} {settings.db_username} {settings.db_password}")
 
 
 def get_settings() -> Settings:

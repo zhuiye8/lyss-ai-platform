@@ -1,20 +1,18 @@
 # Lyss AI Platform 基础设施服务配置
 # 用于本地开发环境的数据库、缓存和向量存储服务
 
-version: '3.8'
-
 services:
   # PostgreSQL 主数据库
   postgres:
     image: postgres:15-alpine
     container_name: lyss-postgres
     environment:
-      POSTGRES_DB: lyss_platform
-      POSTGRES_USER: lyss_user
-      POSTGRES_PASSWORD: lyss_dev_password_2025
+      POSTGRES_DB: lyss_db
+      POSTGRES_USER: lyss
+      POSTGRES_PASSWORD: test
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -31,7 +29,7 @@ services:
       - "-c"
       - "shared_buffers=256MB"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lyss_user -d lyss_platform"]
+      test: ["CMD-SHELL", "pg_isready -U lyss -d lyss_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,13 +42,13 @@ services:
     image: redis:7-alpine
     container_name: lyss-redis
     environment:
-      REDIS_PASSWORD: lyss_redis_password_2025
+      REDIS_PASSWORD:
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
       - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass lyss_redis_password_2025
+    command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s

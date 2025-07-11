@@ -1,0 +1,276 @@
+/**
+ * 登录页面样式
+ * 响应式设计，支持桌面和移动端
+ */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+}
+
+/* Logo和标题区域 */
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.logo img {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+}
+
+/* 登录卡片 */
+.login-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.login-card .ant-card-head {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 16px 24px;
+}
+
+.login-card .ant-card-body {
+  padding: 24px;
+}
+
+/* 错误提示 */
+.error-alert {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* 输入框图标 */
+.input-icon {
+  color: #bfbfbf;
+}
+
+/* 登录选项 */
+.login-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 其他登录方式 */
+.alternative-login {
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* 底部信息 */
+.login-footer {
+  text-align: center;
+  margin-top: 32px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 背景装饰 */
+.login-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-shapes {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  animation: float 6s ease-in-out infinite;
+}
+
+.shape-1 {
+  width: 200px;
+  height: 200px;
+  top: 10%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.shape-2 {
+  width: 150px;
+  height: 150px;
+  top: 60%;
+  right: 10%;
+  animation-delay: 2s;
+}
+
+.shape-3 {
+  width: 100px;
+  height: 100px;
+  bottom: 20%;
+  left: 60%;
+  animation-delay: 4s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 0.8;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .login-container {
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .login-content {
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  .login-header {
+    margin-bottom: 24px;
+  }
+
+  .logo img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .login-card {
+    margin: 0;
+  }
+
+  .login-card .ant-card-body {
+    padding: 20px;
+  }
+
+  .login-footer {
+    margin-top: 24px;
+  }
+
+  /* 调整背景形状 */
+  .shape-1 {
+    width: 120px;
+    height: 120px;
+  }
+
+  .shape-2 {
+    width: 100px;
+    height: 100px;
+  }
+
+  .shape-3 {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-content {
+    padding: 12px;
+  }
+
+  .login-card .ant-card-head {
+    padding: 12px 16px;
+  }
+
+  .login-card .ant-card-body {
+    padding: 16px;
+  }
+
+  .login-header {
+    margin-bottom: 20px;
+  }
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .login-card {
+    background: rgba(20, 20, 20, 0.95);
+    color: #fff;
+  }
+
+  .login-card .ant-card-head {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .error-alert {
+    background: rgba(255, 77, 79, 0.1);
+    border-color: rgba(255, 77, 79, 0.3);
+    color: #ff4d4f;
+  }
+}
+
+/* 动画增强 */
+.login-card {
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 按钮悬停效果 */
+.ant-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* 输入框焦点效果 */
+.ant-input:focus,
+.ant-input-password:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* 链接悬停效果 */
+.ant-typography a:hover {
+  color: #40a9ff;
+  text-decoration: underline;
+}

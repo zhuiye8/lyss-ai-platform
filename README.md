@@ -94,12 +94,12 @@ docker-compose ps
 # 终端 1 - Auth Service (认证服务)
 cd auth-service
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn auth_service.main:app --host 0.0.0.0 --port 8001 --reload
 
 # 终端 2 - Tenant Service (租户管理服务)
 cd tenant-service  
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+uvicorn tenant_service.main:app --host 0.0.0.0 --port 8002 --reload
 
 # 终端 3 - EINO Service (AI工作流服务)
 cd eino-service
