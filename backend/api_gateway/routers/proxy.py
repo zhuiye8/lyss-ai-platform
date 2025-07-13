@@ -4,7 +4,7 @@
 处理所有需要代理的API请求
 """
 
-from typing import Union
+from typing import Union, Optional, Dict, Any
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import Response
 from starlette.responses import StreamingResponse
@@ -13,10 +13,39 @@ from ..services.proxy_service import proxy_service
 from ..core.dependencies import get_current_user
 from ..core.logging import get_logger
 from ..utils.exceptions import InvalidInputError
+from ..config import settings
 
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+async def get_conditional_user(request: Request) -> Optional[Dict[str, Any]]:
+    """
+    根据路由配置条件获取用户信息
+    
+    Args:
+        request: FastAPI请求对象
+        
+    Returns:
+        用户信息字典或None
+    """
+    path = request.url.path
+    route_config = settings.route_config
+    
+    # 查找匹配的路由配置
+    require_auth = True
+    for route_prefix, config in route_config.items():
+        if path.startswith(route_prefix):
+            require_auth = config.require_auth
+            break
+    
+    # 如果不需要认证，返回空字典
+    if not require_auth:
+        return {}
+    
+    # 需要认证，调用标准认证流程
+    return await get_current_user(request)
 
 
 @router.api_route(
@@ -27,7 +56,7 @@ router = APIRouter()
 async def proxy_auth_requests(
     path: str,
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理认证服务请求
@@ -35,7 +64,7 @@ async def proxy_auth_requests(
     Args:
         path: 请求路径
         request: FastAPI请求对象
-        current_user: 当前用户信息
+        current_user: 当前用户信息（条件性）
         
     Returns:
         HTTP响应或流式响应
@@ -52,7 +81,7 @@ async def proxy_auth_requests(
 async def proxy_admin_requests(
     path: str,
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理管理服务请求
@@ -77,7 +106,7 @@ async def proxy_admin_requests(
 async def proxy_chat_requests(
     path: str,
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理聊天服务请求
@@ -102,7 +131,7 @@ async def proxy_chat_requests(
 async def proxy_memory_requests(
     path: str,
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理记忆服务请求
@@ -127,14 +156,14 @@ async def proxy_memory_requests(
 )
 async def proxy_auth_root(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理认证服务根路径请求
     
     Args:
         request: FastAPI请求对象
-        current_user: 当前用户信息
+        current_user: 当前用户信息（条件性）
         
     Returns:
         HTTP响应或流式响应
@@ -150,7 +179,7 @@ async def proxy_auth_root(
 )
 async def proxy_admin_root(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理管理服务根路径请求
@@ -173,7 +202,7 @@ async def proxy_admin_root(
 )
 async def proxy_chat_root(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理聊天服务根路径请求
@@ -196,7 +225,7 @@ async def proxy_chat_root(
 )
 async def proxy_memory_root(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_conditional_user)
 ):
     """
     代理记忆服务根路径请求

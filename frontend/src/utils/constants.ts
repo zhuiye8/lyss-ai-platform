@@ -184,7 +184,23 @@ export const STATUS_CONFIG = {
   DISABLED: { color: 'gray', text: '已禁用' },
 } as const;
 
-// 角色配置
+// 用户角色配置
+export const USER_ROLES = {
+  admin: { label: '管理员', color: 'red' },
+  user: { label: '普通用户', color: 'blue' },
+  viewer: { label: '观察者', color: 'gray' },
+  moderator: { label: '协调员', color: 'orange' },
+} as const;
+
+// 用户状态配置
+export const USER_STATUS = {
+  active: { label: '正常', color: 'green' },
+  inactive: { label: '禁用', color: 'red' },
+  pending: { label: '待验证', color: 'orange' },
+  suspended: { label: '暂停', color: 'volcano' },
+} as const;
+
+// 角色配置（保持兼容性）
 export const ROLE_CONFIG = {
   ADMIN: { color: 'red', text: '管理员' },
   USER: { color: 'blue', text: '用户' },

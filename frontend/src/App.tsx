@@ -14,6 +14,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 // 页面组件
 import LoginPage from '@/pages/login';
 import DashboardPage from '@/pages/dashboard';
+import ChatPage from '@/pages/chat';
 import AdminLayout from '@/components/layout/AdminLayout';
 
 // 通用组件

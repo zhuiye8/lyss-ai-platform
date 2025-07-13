@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     health_check_timeout: int = Field(default=5, description="健康检查超时(秒)")
     
     # 速率限制
-    rate_limit_requests: int = Field(default=100, description="速率限制请求数")
+    rate_limit_requests: int = Field(default=1000, description="速率限制请求数")
     rate_limit_window: int = Field(default=60, description="速率限制窗口(秒)")
     
     # 环境标识

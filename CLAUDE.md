@@ -2,12 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 重要提醒 - 项目状态更新 (2025-07-11)
+## 🚨 重要提醒 - 项目状态更新 (2025-07-13)
 
-**当前项目状态**: Auth Service + Tenant Service + Backend API Gateway 已完成，准备开发 Frontend 前端应用
+**当前项目状态**: 核心认证链路已打通，登录功能正常，Tenant Service 管理API待补全  
 **如果你是继续开发的Claude**: 
-1. 请务必先阅读 `MEMORY_FILE.md` 文件，获取完整的项目状态和技术细节
-2. 然后阅读 `DEVELOPMENT_PRIORITY.md` 文件，了解当前开发优先级
+1. 请务必先阅读 `CURRENT_STATUS.md` 文件，快速了解当前开发状态和下一步任务
+2. 然后阅读 `DEVELOPMENT_PRIORITY.md` 文件，获取详细的开发优先级和进度
+3. 参考 `docs/tenant_service.md` 了解需要实现的API规范
 
 ### 已完成的基础工作
 - ✅ **项目架构设计和文档 (100%)**
@@ -26,11 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 与Tenant Service集成调用
   - 完整错误处理和中文日志
 
-- ✅ **Tenant Service - 租户服务 (100%)** (2025-07-11)
-  - 租户管理、用户管理、供应商凭证管理
-  - pgcrypto加密存储，多租户数据隔离
-  - SQLAlchemy关系映射完整修复
-  - 内部服务接口为Auth Service提供用户验证
+- ⚠️ **Tenant Service - 租户服务 (80%)** (2025-07-11)
+  - ✅ 内部用户验证接口，pgcrypto加密存储，多租户数据隔离
+  - ✅ SQLAlchemy关系映射，Repository层完整
+  - ⏳ 租户管理、用户管理、供应商凭证管理API待补全
 
 - ✅ **Backend API Gateway - API网关服务 (100%)** (2025-07-11)
   - 统一入口和路由转发，JWT认证集成
@@ -39,8 +39,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 与Auth Service和Tenant Service无缝集成
 
 ### 下一步工作重点
-1. **Frontend (前端应用)** (优先级: 高) - 下一个开发目标
-2. **EINO Service + Memory Service** (优先级: 中)
+1. **Tenant Service 管理API补全** (优先级: 高) - 当前开发目标
+2. **Frontend 管理界面实现** (优先级: 高) 
+3. **EINO Service + Memory Service** (优先级: 中)
 
 ### 核心开发要求
 1. **全程使用中文注释和回复**

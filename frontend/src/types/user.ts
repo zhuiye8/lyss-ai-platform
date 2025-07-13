@@ -135,6 +135,27 @@ export interface UserPermission {
   created_at: string;
 }
 
+// 创建用户请求
+export interface CreateUserRequest {
+  email: string;
+  name: string;
+  username?: string;
+  password: string;
+  role: string;
+  phone?: string;
+  is_active?: boolean;
+}
+
+// 更新用户请求
+export interface UpdateUserRequest {
+  name?: string;
+  username?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  is_active?: boolean;
+}
+
 // 用户邀请
 export interface UserInvitation {
   id: ID;

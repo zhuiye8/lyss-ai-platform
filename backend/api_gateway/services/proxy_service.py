@@ -197,6 +197,12 @@ class ProxyService:
         Returns:
             目标路径
         """
+        # 对于Auth Service，保持完整的API路径
+        # 因为Auth Service期望 /api/v1/auth/login 而不是 /login
+        if route_config["service_name"] == "auth_service":
+            return original_path
+        
+        # 对于其他服务，提取相对路径
         prefix = route_config["prefix"]
         
         # 如果路径完全匹配前缀，返回根路径
@@ -242,10 +248,14 @@ class ProxyService:
             headers["X-User-Role"] = user_info.get("role", "")
             headers["X-User-Email"] = user_info.get("email", "")
         
-        # 移除可能导致问题的头部
-        headers_to_remove = ["Host", "Content-Length"]
-        for header in headers_to_remove:
-            headers.pop(header, None)
+        # 移除可能导致问题的头部（不区分大小写）
+        headers_to_remove = ["host", "content-length", "connection", "transfer-encoding"]
+        headers_lower = {k.lower(): k for k in headers.keys()}
+        
+        for header_lower in headers_to_remove:
+            if header_lower in headers_lower:
+                original_key = headers_lower[header_lower]
+                headers.pop(original_key, None)
         
         return headers
     

@@ -6,7 +6,7 @@
 import httpClient from './http';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { Tenant, CreateTenantRequest, UpdateTenantRequest } from '@/types/tenant';
-import { ApiResponse, PaginationResponse } from '@/types/api';
+import { ApiResponse, PaginatedResponse } from '@/types/common';
 
 /**
  * 租户管理服务类

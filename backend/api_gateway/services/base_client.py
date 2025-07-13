@@ -13,7 +13,7 @@ from fastapi import Request, Response
 from starlette.responses import StreamingResponse
 
 from ..core.logging import get_logger, log_service_call
-from ..utils.exceptions import ServiceUnavailableError, RequestTimeoutError, InternalServerError
+from ..utils.exceptions import ServiceUnavailableError, RequestTimeoutError, InternalServerError, DownstreamServiceError
 from ..utils.helpers import build_service_url, mask_sensitive_data
 from ..utils.constants import CUSTOM_HEADERS, HTTP_METHODS
 from ..config import settings
@@ -122,7 +122,8 @@ class BaseServiceClient:
             # 计算耗时
             duration_ms = int((time.time() - start_time) * 1000)
             
-            # 记录成功日志
+            # 记录日志
+            is_success = 200 <= response.status_code < 400
             log_service_call(
                 logger,
                 self.service_name,
@@ -131,12 +132,16 @@ class BaseServiceClient:
                 response.status_code,
                 duration_ms,
                 request_id,
-                success=True,
+                success=is_success,
                 data={
                     "url": full_url,
                     "response_size": len(response.content) if response.content else 0
                 }
             )
+            
+            # 对于错误响应，透传下游服务的错误信息
+            if not is_success:
+                await self._handle_downstream_error(response, full_url, request_id)
             
             # 如果是流式响应，返回StreamingResponse
             if stream or self._is_streaming_response(response):
@@ -207,6 +212,117 @@ class BaseServiceClient:
                 f"请求 {self.service_name} 时发生错误: {str(e)}",
                 details={"url": full_url, "error": str(e)}
             )
+    
+    async def _handle_downstream_error(
+        self, 
+        response: httpx.Response, 
+        url: str, 
+        request_id: Optional[str]
+    ):
+        """
+        处理下游服务错误，透传具体的错误信息
+        
+        Args:
+            response: 下游服务的错误响应
+            url: 请求URL
+            request_id: 请求ID
+            
+        Raises:
+            DownstreamServiceError: 透传的下游服务错误
+        """
+        try:
+            # 尝试解析下游服务的错误响应
+            error_data = response.json()
+            
+            # 如果下游服务返回了符合我们规范的错误格式
+            if isinstance(error_data, dict) and "error" in error_data:
+                error_info = error_data["error"]
+                error_code = error_info.get("code", "5003")
+                error_message = error_info.get("message", "下游服务返回错误")
+                error_details = error_info.get("details", {})
+                
+                # 记录下游服务错误
+                logger.warning(
+                    f"下游服务 {self.service_name} 返回业务错误",
+                    extra={
+                        "request_id": request_id,
+                        "service": self.service_name,
+                        "status_code": response.status_code,
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "url": url
+                    }
+                )
+                
+                # 透传下游服务的错误
+                raise DownstreamServiceError(
+                    status_code=response.status_code,
+                    error_code=error_code,
+                    message=error_message,
+                    details=error_details,
+                    service_name=self.service_name
+                )
+            
+            # 如果是其他格式的错误响应
+            elif isinstance(error_data, dict) and "success" in error_data and not error_data["success"]:
+                # 处理success:false格式的响应
+                error_message = error_data.get("message", "下游服务返回错误")
+                error_details = {"response": error_data}
+                
+                logger.warning(
+                    f"下游服务 {self.service_name} 返回失败响应",
+                    extra={
+                        "request_id": request_id,
+                        "service": self.service_name,
+                        "status_code": response.status_code,
+                        "error_message": error_message,
+                        "url": url
+                    }
+                )
+                
+                raise DownstreamServiceError(
+                    status_code=response.status_code,
+                    error_code="5003",
+                    message=error_message,
+                    details=error_details,
+                    service_name=self.service_name
+                )
+            
+        except ValueError:
+            # JSON解析失败，使用原始响应文本
+            error_text = response.text
+            
+        except Exception as e:
+            # 其他解析错误
+            logger.error(
+                f"解析下游服务 {self.service_name} 错误响应失败: {str(e)}",
+                extra={
+                    "request_id": request_id,
+                    "service": self.service_name,
+                    "url": url
+                }
+            )
+            error_text = response.text or "未知错误"
+        
+        # 如果无法解析具体错误，创建通用错误
+        logger.warning(
+            f"下游服务 {self.service_name} 返回HTTP错误",
+            extra={
+                "request_id": request_id,
+                "service": self.service_name,
+                "status_code": response.status_code,
+                "response_text": error_text[:500],  # 限制日志长度
+                "url": url
+            }
+        )
+        
+        raise DownstreamServiceError(
+            status_code=response.status_code,
+            error_code="5003",
+            message=f"下游服务 {self.service_name} 返回错误: {error_text[:100]}",
+            details={"url": url, "response_status": response.status_code},
+            service_name=self.service_name
+        )
     
     def _prepare_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
         """

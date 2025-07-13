@@ -138,8 +138,12 @@ async def request_logging_middleware(request: Request, call_next) -> Response:
         raise
 
 
+# 导入所有路由模块
+from .routers import health, internal, tenants, users, suppliers
+
 # 注册路由
 app.include_router(health.router, tags=["健康检查"])
+app.include_router(internal.router, tags=["内部服务接口"])
 
 # 根路径
 @app.get("/", summary="服务信息")

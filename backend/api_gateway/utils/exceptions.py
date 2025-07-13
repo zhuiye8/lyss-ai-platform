@@ -150,3 +150,28 @@ class InternalServerError(LyssAPIException):
             message=message,
             details=details
         )
+
+
+class DownstreamServiceError(LyssAPIException):
+    """下游服务错误 - 透传下游服务的具体错误信息"""
+    
+    def __init__(
+        self, 
+        status_code: int,
+        error_code: str, 
+        message: str, 
+        details: Optional[Dict[str, Any]] = None,
+        service_name: Optional[str] = None
+    ):
+        # 如果有服务名称，在详情中添加
+        if service_name and details:
+            details["service"] = service_name
+        elif service_name:
+            details = {"service": service_name}
+            
+        super().__init__(
+            status_code=status_code,
+            error_code=error_code,
+            message=message,
+            details=details
+        )

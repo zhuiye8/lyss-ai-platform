@@ -5,7 +5,7 @@
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { message } from 'antd';
-import { ApiResponse, ApiError } from '@/types/api';
+import { ApiResponse, ApiError } from '@/types/common';
 
 // 获取环境变量配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';

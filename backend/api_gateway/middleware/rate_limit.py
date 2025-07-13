@@ -254,8 +254,9 @@ class AdaptiveRateLimitMiddleware(BaseHTTPMiddleware):
         
         # 不同路径的限制配置
         self.path_limits = {
-            "/api/v1/auth/login": 10,  # 登录接口限制更严格
-            "/api/v1/auth/register": 5,  # 注册接口限制更严格
+            "/api/v1/auth/token": 20,  # 登录接口允许更多尝试
+            "/api/v1/auth/refresh": 30,  # 刷新令牌接口
+            "/api/v1/auth/register": 10,  # 注册接口限制适中
             "/health": 1000,  # 健康检查接口限制宽松
             "default": settings.rate_limit_requests
         }

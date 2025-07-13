@@ -15,7 +15,7 @@ from .core.logging import setup_logging, get_logger
 from .middleware.cors import setup_cors_middleware
 from .middleware.request_id import RequestIdMiddleware
 from .middleware.auth import AuthMiddleware, TenantContextMiddleware
-from .middleware.rate_limit import RateLimitMiddleware
+from .middleware.rate_limit import RateLimitMiddleware, AdaptiveRateLimitMiddleware
 from .middleware.error_handler import (
     ErrorHandlingMiddleware,
     custom_http_exception_handler,
@@ -98,8 +98,11 @@ def setup_middleware():
     # 2. Gzip压缩中间件
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     
-    # 3. 速率限制中间件
-    app.add_middleware(RateLimitMiddleware)
+    # 3. 速率限制中间件（在开发环境使用自适应限制）
+    if settings.debug:
+        app.add_middleware(AdaptiveRateLimitMiddleware)
+    else:
+        app.add_middleware(RateLimitMiddleware)
     
     # 4. 租户上下文中间件
     app.add_middleware(TenantContextMiddleware)

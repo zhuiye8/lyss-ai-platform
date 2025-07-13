@@ -15,11 +15,22 @@ export class AuthService {
    */
   static async login(credentials: AuthAPI.LoginRequest): Promise<ApiResponse<AuthAPI.LoginResponse>> {
     try {
-      const response = await httpClient.post<ApiResponse<AuthAPI.LoginResponse>>(
-        `${this.BASE_URL}/login`,
-        credentials
+      // Auth Service期望OAuth2格式的form-encoded数据
+      const formData = new URLSearchParams();
+      formData.append('username', credentials.email);
+      formData.append('password', credentials.password);
+      
+      const response = await httpClient.getInstance().post(
+        `${this.BASE_URL}/token`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
       );
-      return response;
+      
+      return response.data;
     } catch (error) {
       console.error('登录失败:', error);
       throw error;
