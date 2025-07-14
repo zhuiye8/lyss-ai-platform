@@ -517,3 +517,75 @@ class UserService:
             created_at=user.created_at,
             updated_at=user.updated_at
         )
+    
+    async def verify_user_credentials(
+        self,
+        identifier: str,
+        password: str,
+        request_id: str
+    ) -> Optional[User]:
+        """
+        验证用户密码凭证
+        
+        Args:
+            identifier: 用户标识（邮箱或用户名）
+            password: 明文密码
+            request_id: 请求ID
+            
+        Returns:
+            验证成功返回用户对象，失败返回None
+        """
+        try:
+            # 根据邮箱或用户名查找用户
+            user = await self.user_repo.get_by_email_or_username(identifier)
+            
+            if not user:
+                logger.warning(
+                    f"用户验证失败: 用户不存在",
+                    request_id=request_id,
+                    identifier=identifier,
+                    operation="verify_user_credentials"
+                )
+                return None
+            
+            # 验证密码
+            if not pwd_context.verify(password, user.hashed_password):
+                logger.warning(
+                    f"用户验证失败: 密码错误",
+                    request_id=request_id,
+                    user_id=str(user.id),
+                    identifier=identifier,
+                    operation="verify_user_credentials"
+                )
+                return None
+            
+            # 检查用户状态
+            if not user.is_active:
+                logger.warning(
+                    f"用户验证失败: 用户未激活",
+                    request_id=request_id,
+                    user_id=str(user.id),
+                    identifier=identifier,
+                    operation="verify_user_credentials"
+                )
+                return None
+            
+            logger.info(
+                f"用户验证成功",
+                request_id=request_id,
+                user_id=str(user.id),
+                identifier=identifier,
+                operation="verify_user_credentials"
+            )
+            
+            return user
+            
+        except Exception as e:
+            logger.error(
+                f"用户验证异常: {str(e)}",
+                request_id=request_id,
+                identifier=identifier,
+                error=str(e),
+                operation="verify_user_credentials"
+            )
+            return None

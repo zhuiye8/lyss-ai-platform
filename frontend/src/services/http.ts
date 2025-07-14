@@ -55,8 +55,8 @@ class HttpClient {
         config.headers['X-Request-ID'] = requestId;
 
         // 添加时间戳
-        config.metadata = {
-          ...config.metadata,
+        (config as any).metadata = {
+          ...(config as any).metadata,
           startTime: Date.now(),
           requestId,
         };
@@ -77,7 +77,7 @@ class HttpClient {
     this.instance.interceptors.response.use(
       (response) => {
         // 记录请求耗时
-        const startTime = response.config.metadata?.startTime;
+        const startTime = (response.config as any).metadata?.startTime;
         if (startTime) {
           const duration = Date.now() - startTime;
           console.debug(`API请求完成: ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);

@@ -43,6 +43,7 @@ class UserInfo(BaseModel):
     role: str = Field(default="end_user", description="用户角色")
     is_active: bool = Field(default=True, description="账户是否激活")
     last_login_at: Optional[str] = Field(None, description="上次登录时间")
+    hashed_password: str = Field(..., description="用户密码哈希（仅用于内部认证）")
 
     class Config:
         json_schema_extra = {
@@ -55,6 +56,13 @@ class UserInfo(BaseModel):
                 "last_login_at": "2025-07-10T10:30:00Z"
             }
         }
+        
+    def dict(self, **kwargs):
+        """重写dict方法，排除敏感字段"""
+        if 'exclude' not in kwargs:
+            kwargs['exclude'] = set()
+        kwargs['exclude'].add('hashed_password')
+        return super().dict(**kwargs)
 
 
 class TokenResponse(BaseModel):
@@ -64,7 +72,7 @@ class TokenResponse(BaseModel):
     token_type: str = Field(default="bearer", description="令牌类型")
     expires_in: int = Field(..., description="令牌过期时间（秒）")
     refresh_token: str = Field(..., description="刷新令牌")
-    user_info: UserInfo = Field(..., description="用户信息")
+    user_info: dict = Field(..., description="用户信息（不包含敏感字段）")
 
     class Config:
         json_schema_extra = {

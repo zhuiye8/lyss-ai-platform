@@ -145,6 +145,11 @@ from .routers import health, internal, tenants, users, suppliers
 app.include_router(health.router, tags=["健康检查"])
 app.include_router(internal.router, tags=["内部服务接口"])
 
+# 注册管理API路由
+app.include_router(tenants.router, prefix="/api/v1", tags=["租户管理"])
+app.include_router(users.router, prefix="/api/v1", tags=["用户管理"])
+app.include_router(suppliers.router, prefix="/api/v1", tags=["供应商凭证管理"])
+
 # 根路径
 @app.get("/", summary="服务信息")
 async def root():

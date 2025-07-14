@@ -135,7 +135,7 @@ class BaseServiceClient:
                 success=is_success,
                 data={
                     "url": full_url,
-                    "response_size": len(response.content) if response.content else 0
+                    "response_size": len(response.text) if response.text else 0
                 }
             )
             
@@ -147,7 +147,8 @@ class BaseServiceClient:
             if stream or self._is_streaming_response(response):
                 return await self._create_streaming_response(response)
             
-            return response
+            # 将httpx.Response转换为FastAPI可序列化的Response
+            return await self._create_fastapi_response(response)
             
         except httpx.TimeoutException:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -208,9 +209,19 @@ class BaseServiceClient:
                 error_message=str(e)
             )
             
+            # 获取更详细的错误信息
+            error_message = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_detail = e.response.text
+                    if error_detail:
+                        error_message = f"{error_message} - 响应内容: {error_detail}"
+                except:
+                    pass
+            
             raise InternalServerError(
-                f"请求 {self.service_name} 时发生错误: {str(e)}",
-                details={"url": full_url, "error": str(e)}
+                f"请求 {self.service_name} 时发生错误: {error_message}",
+                details={"url": full_url, "error": error_message}
             )
     
     async def _handle_downstream_error(
@@ -290,7 +301,7 @@ class BaseServiceClient:
             
         except ValueError:
             # JSON解析失败，使用原始响应文本
-            error_text = response.text
+            error_text = response.text or "无法解析响应内容"
             
         except Exception as e:
             # 其他解析错误
@@ -390,6 +401,40 @@ class BaseServiceClient:
             media_type=response.headers.get("content-type", "application/octet-stream")
         )
     
+    async def _create_fastapi_response(self, response: httpx.Response) -> Response:
+        """
+        将httpx.Response转换为FastAPI可序列化的Response
+        
+        Args:
+            response: httpx响应对象
+            
+        Returns:
+            FastAPI Response对象
+        """
+        # 读取响应内容
+        content = await response.aread()
+        
+        # 过滤掉可能导致问题的头部
+        filtered_headers = {}
+        headers_to_exclude = {
+            'content-length',  # FastAPI会自动设置
+            'transfer-encoding',  # 避免传输编码冲突
+            'connection',  # 连接相关头部
+            'keep-alive',  # 连接保持头部
+        }
+        
+        for key, value in response.headers.items():
+            if key.lower() not in headers_to_exclude:
+                filtered_headers[key] = value
+        
+        # 创建FastAPI Response对象
+        return Response(
+            content=content,
+            status_code=response.status_code,
+            headers=filtered_headers,
+            media_type=response.headers.get("content-type", "application/json")
+        )
+    
     async def health_check(self, request_id: Optional[str] = None) -> Dict[str, Any]:
         """
         健康检查
@@ -412,7 +457,7 @@ class BaseServiceClient:
                     "status": "healthy",
                     "service": self.service_name,
                     "response_time_ms": getattr(response, 'elapsed', 0),
-                    "data": response.json() if response.content else {}
+                    "data": response.json() if response.text else {}
                 }
             else:
                 return {

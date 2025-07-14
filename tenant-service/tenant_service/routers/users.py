@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
 from ..core.database import get_db
-from ..models.schemas.base import ApiResponse, PaginatedResponse
+from ..models.schemas.base import ApiResponse, PaginatedResponse, PaginationInfo
 from ..models.schemas.user import (
     UserCreateRequest,
     UserUpdateRequest, 
@@ -118,7 +118,7 @@ async def create_user(
 
 @router.get(
     "/admin/users",
-    response_model=PaginatedResponse[UserResponse],
+    response_model=ApiResponse[PaginatedResponse[UserResponse]],
     summary="获取用户列表",
     description="分页获取当前租户的用户列表"
 )
@@ -134,7 +134,7 @@ async def get_users(
     db: AsyncSession = Depends(get_db),
     request_id: str = Depends(get_request_id),
     tenant_id: str = Depends(get_current_tenant_id)
-) -> PaginatedResponse[UserResponse]:
+) -> ApiResponse[PaginatedResponse[UserResponse]]:
     """
     获取用户列表
     
@@ -173,9 +173,8 @@ async def get_users(
             tenant_id, list_params, request_id
         )
         
-        return PaginatedResponse[UserResponse](
-            success=True,
-            data=users,
+        pagination_data = PaginatedResponse[UserResponse](
+            items=users,
             pagination=PaginationInfo(
                 page=page,
                 page_size=page_size,
@@ -183,7 +182,12 @@ async def get_users(
                 total_pages=(total_count + page_size - 1) // page_size,
                 has_next=page * page_size < total_count,
                 has_prev=page > 1
-            ),
+            )
+        )
+        
+        return ApiResponse[PaginatedResponse[UserResponse]](
+            success=True,
+            data=pagination_data,
             message="用户列表获取成功",
             request_id=request_id
         )

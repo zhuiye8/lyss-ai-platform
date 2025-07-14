@@ -122,7 +122,7 @@ async def create_supplier_credential(
 
 @router.get(
     "/admin/suppliers",
-    response_model=PaginatedResponse[SupplierCredentialResponse],
+    response_model=ApiResponse[PaginatedResponse[SupplierCredentialResponse]],
     summary="获取供应商凭证列表",
     description="获取当前租户的供应商凭证列表（不返回API密钥）"
 )
@@ -137,7 +137,7 @@ async def get_supplier_credentials(
     db: AsyncSession = Depends(get_db),
     request_id: str = Depends(get_request_id),
     tenant_id: str = Depends(get_current_tenant_id)
-) -> PaginatedResponse[SupplierCredentialResponse]:
+) -> ApiResponse[PaginatedResponse[SupplierCredentialResponse]]:
     """
     获取供应商凭证列表
     
@@ -174,9 +174,8 @@ async def get_supplier_credentials(
             tenant_id, list_params, request_id
         )
         
-        return PaginatedResponse[SupplierCredentialResponse](
-            success=True,
-            data=credentials,
+        pagination_data = PaginatedResponse[SupplierCredentialResponse](
+            items=credentials,
             pagination=PaginationInfo(
                 page=page,
                 page_size=page_size,
@@ -184,7 +183,12 @@ async def get_supplier_credentials(
                 total_pages=(total_count + page_size - 1) // page_size,
                 has_next=page * page_size < total_count,
                 has_prev=page > 1
-            ),
+            )
+        )
+        
+        return ApiResponse[PaginatedResponse[SupplierCredentialResponse]](
+            success=True,
+            data=pagination_data,
             message="供应商凭证列表获取成功",
             request_id=request_id
         )

@@ -6,8 +6,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AuthService } from '@/services/auth';
-import { User, LoginCredentials, UserSession } from '@/types/user';
+import { User, LoginCredentials } from '@/types/user';
 import { AuthAPI } from '@/types/api';
+import { Role } from '@/types/common';
 
 // 认证状态接口
 interface AuthState {
@@ -61,15 +62,25 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const response = await AuthService.login(credentials);
-          const { user, access_token, refresh_token } = response.data!;
+          // AuthService已经处理了数据转换，这里直接使用标准格式
+          const { user, access_token, refresh_token } = response.data as AuthAPI.LoginResponse;
 
           // 存储令牌
           localStorage.setItem(JWT_STORAGE_KEY, access_token);
           localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
 
+          // 为User类型补充必要字段
+          const completeUser: User = {
+            ...user,
+            role: user.role as Role, // 明确角色类型转换
+            is_verified: true, // 能够登录说明邮箱已验证
+            created_at: new Date().toISOString(), // 使用当前时间作为默认值
+            updated_at: new Date().toISOString(), // 使用当前时间作为默认值
+          };
+
           // 更新状态
           set({
-            user,
+            user: completeUser,
             isAuthenticated: true,
             loading: false,
             error: null,
@@ -164,7 +175,7 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const response = await AuthService.getCurrentUser();
-          const user = response.data!;
+          const user = response.data as User;
 
           set({
             user,
@@ -223,7 +234,7 @@ export const useAuthStore = create<AuthState>()(
       /**
        * 检查用户是否有特定权限
        */
-      hasPermission: (permission: string) => {
+      hasPermission: (_permission: string) => {
         const { user } = get();
         if (!user) return false;
 

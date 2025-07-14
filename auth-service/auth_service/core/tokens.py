@@ -26,6 +26,7 @@ class TokenPayload(BaseModel):
     exp: int  # 过期时间
     iat: int  # 签发时间
     jti: str  # 令牌唯一标识
+    token_type: Optional[str] = None  # 令牌类型（refresh等）
 
 
 class TokenManager:
@@ -122,6 +123,8 @@ class TokenManager:
         refresh_data = {
             "user_id": user_data["user_id"],
             "tenant_id": user_data["tenant_id"],
+            "role": user_data.get("role", "end_user"),
+            "email": user_data["email"],  # 刷新令牌也需要包含email用于验证
             "token_type": "refresh",
         }
         
@@ -171,6 +174,7 @@ class TokenManager:
                 exp=payload["exp"],
                 iat=payload["iat"],
                 jti=payload["jti"],
+                token_type=payload.get("token_type"),  # 包含令牌类型
             )
 
             return token_payload

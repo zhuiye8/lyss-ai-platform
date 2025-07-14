@@ -109,7 +109,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 details={
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
-                } if logger.logger.isEnabledFor(10) else None,  # 只在DEBUG模式下暴露详细错误
+                } if request.app.debug else None,  # 只在DEBUG模式下暴露详细错误
             )
 
             # 记录详细错误日志

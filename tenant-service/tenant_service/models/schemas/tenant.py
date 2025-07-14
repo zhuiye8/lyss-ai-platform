@@ -7,7 +7,7 @@
 
 import uuid
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from .base import BaseSchema, IdSchema, TimestampSchema
 
@@ -21,7 +21,8 @@ class TenantCreateRequest(BaseSchema):
     max_users: int = Field(10, description="最大用户数", ge=1, le=10000)
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="租户设置")
     
-    @validator('slug')
+    @field_validator('slug')
+    @classmethod
     def validate_slug(cls, v):
         """验证slug格式"""
         import re
@@ -29,7 +30,8 @@ class TenantCreateRequest(BaseSchema):
             raise ValueError('slug只能包含小写字母、数字和连字符，不能以连字符开头或结尾')
         return v
     
-    @validator('subscription_plan')
+    @field_validator('subscription_plan')
+    @classmethod
     def validate_subscription_plan(cls, v):
         """验证订阅计划"""
         valid_plans = ['basic', 'standard', 'premium', 'enterprise']
@@ -47,7 +49,8 @@ class TenantUpdateRequest(BaseSchema):
     max_users: Optional[int] = Field(None, description="最大用户数", ge=1, le=10000)
     settings: Optional[Dict[str, Any]] = Field(None, description="租户设置")
     
-    @validator('status')
+    @field_validator('status')
+    @classmethod
     def validate_status(cls, v):
         """验证状态"""
         if v is not None:
@@ -56,7 +59,8 @@ class TenantUpdateRequest(BaseSchema):
                 raise ValueError(f'状态必须是以下之一: {", ".join(valid_statuses)}')
         return v
     
-    @validator('subscription_plan')
+    @field_validator('subscription_plan')
+    @classmethod
     def validate_subscription_plan(cls, v):
         """验证订阅计划"""
         if v is not None:
@@ -107,7 +111,8 @@ class TenantListParams(BaseSchema):
     sort_by: str = Field("created_at", description="排序字段")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="排序方向")
     
-    @validator('status')
+    @field_validator('status')
+    @classmethod
     def validate_status(cls, v):
         """验证状态过滤"""
         if v is not None:
@@ -116,7 +121,8 @@ class TenantListParams(BaseSchema):
                 raise ValueError(f'状态必须是以下之一: {", ".join(valid_statuses)}')
         return v
     
-    @validator('subscription_plan')
+    @field_validator('subscription_plan')
+    @classmethod
     def validate_subscription_plan(cls, v):
         """验证订阅计划过滤"""
         if v is not None:

@@ -22,9 +22,7 @@ import {
   Row,
   Col,
   Typography,
-  Alert,
   Tooltip,
-  Progress,
   Badge,
   Divider,
 } from 'antd';
@@ -33,24 +31,17 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
-  SearchOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
   ApiOutlined,
-  KeyOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
 import { SupplierService } from '@/services/supplier';
 import { SupplierCredential, CreateSupplierCredentialRequest, UpdateSupplierCredentialRequest } from '@/types/supplier';
-import { PaginationResponse } from '@/types/api';
 import { PAGINATION, SUPPLIER_CONFIG } from '@/utils/constants';
 import { handleApiError } from '@/utils/errorHandler';
-import { useAuth } from '@/store/auth';
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -82,21 +73,17 @@ const SuppliersPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   
   // Modal 状态
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
-  const [testConnectionModalVisible, setTestConnectionModalVisible] = useState(false);
   const [currentSupplier, setCurrentSupplier] = useState<SupplierCredential | null>(null);
   const [showApiKey, setShowApiKey] = useState<{ [key: string]: boolean }>({});
   
   // Form 实例
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
-  
-  const { user } = useAuth();
 
   /**
    * 加载供应商凭证数据
@@ -114,7 +101,7 @@ const SuppliersPage: React.FC = () => {
         sort_order: params.sort_order,
       });
       
-      if (response.success) {
+      if (response.success && response.data) {
         setSuppliers(response.data.items);
         setPagination(prev => ({
           ...prev,
@@ -174,7 +161,7 @@ const SuppliersPage: React.FC = () => {
         <div>
           <strong>{text}</strong>
           {record.is_default && (
-            <Tag color="gold" size="small" style={{ marginLeft: 4 }}>
+            <Tag color="gold" style={{ marginLeft: 4, fontSize: '12px' }}>
               默认
             </Tag>
           )}
@@ -310,7 +297,7 @@ const SuppliersPage: React.FC = () => {
   /**
    * 表格变化处理
    */
-  const handleTableChange = (paginationConfig: any, filters: any, sorter: any) => {
+  const handleTableChange = (paginationConfig: any, _filters: any, sorter: any) => {
     const params: TableParams = {
       page: paginationConfig.current,
       page_size: paginationConfig.pageSize,
@@ -342,7 +329,7 @@ const SuppliersPage: React.FC = () => {
         const response = await SupplierService.getSupplierCredentialDetail(id, { include_api_key: true });
         if (response.success) {
           const supplier = suppliers.find(s => s.id === id);
-          if (supplier) {
+          if (supplier && response.data) {
             supplier.api_key_full = response.data.api_key;
           }
         }
@@ -484,18 +471,6 @@ const SuppliersPage: React.FC = () => {
     }
   };
 
-  /**
-   * 行选择配置
-   */
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (newSelectedRowKeys: React.Key[]) => {
-      setSelectedRowKeys(newSelectedRowKeys);
-    },
-    getCheckboxProps: (record: SupplierCredential) => ({
-      disabled: record.is_default, // 默认凭证不允许选择
-    }),
-  };
 
   return (
     <div>

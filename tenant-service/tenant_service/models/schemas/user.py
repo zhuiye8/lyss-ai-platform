@@ -20,7 +20,7 @@ class UserVerifyRequest(BaseSchema):
 
 
 class UserVerifyResponse(BaseSchema):
-    """用户验证响应模型"""
+    """用户验证响应模型（向后兼容，包含密码哈希）"""
     
     user_id: uuid.UUID = Field(..., description="用户ID")
     email: str = Field(..., description="用户邮箱")
@@ -28,6 +28,17 @@ class UserVerifyResponse(BaseSchema):
     tenant_id: uuid.UUID = Field(..., description="租户ID")
     role: str = Field(..., description="用户角色")
     is_active: bool = Field(..., description="是否激活")
+
+
+class UserPasswordVerifyResponse(BaseSchema):
+    """用户密码验证响应模型（安全版，不包含密码哈希）"""
+    
+    user_id: uuid.UUID = Field(..., description="用户ID")
+    email: str = Field(..., description="用户邮箱")
+    tenant_id: uuid.UUID = Field(..., description="租户ID")
+    role: str = Field(..., description="用户角色")
+    is_active: bool = Field(..., description="是否激活")
+    password_valid: bool = Field(..., description="密码是否正确")
 
 
 class UserCreateRequest(BaseSchema):

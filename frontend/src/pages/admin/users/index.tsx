@@ -47,7 +47,7 @@ import dayjs from 'dayjs';
 
 import { UserService } from '@/services/user';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user';
-import { PaginationResponse } from '@/types/api';
+import { PaginatedResponse } from '@/types/common';
 import { PAGINATION, USER_ROLES, USER_STATUS } from '@/utils/constants';
 import { handleApiError } from '@/utils/errorHandler';
 import { useAuth } from '@/store/auth';
@@ -156,7 +156,7 @@ const UsersPage: React.FC = () => {
             <div>
               <strong>{record.name}</strong>
               {record.id === currentAuthUser?.id && (
-                <Tag color="blue" size="small" style={{ marginLeft: 4 }}>
+                <Tag color="blue" style={{ marginLeft: 4, fontSize: '12px' }}>
                   当前用户
                 </Tag>
               )}
@@ -178,7 +178,7 @@ const UsersPage: React.FC = () => {
           <MailOutlined style={{ color: '#1890ff' }} />
           <span>{email}</span>
           {record.is_verified && (
-            <Tag color="green" size="small">已验证</Tag>
+            <Tag color="green" style={{ fontSize: '12px' }}>已验证</Tag>
           )}
         </Space>
       ),
@@ -216,7 +216,7 @@ const UsersPage: React.FC = () => {
               {statusConfig.label}
             </Tag>
             {!record.is_active && (
-              <Tag color="red" size="small">禁用</Tag>
+              <Tag color="red" style={{ fontSize: '12px' }}>禁用</Tag>
             )}
           </Space>
         );
@@ -940,7 +940,7 @@ const UsersPage: React.FC = () => {
                 <Space>
                   {currentUser.email}
                   {currentUser.is_verified && (
-                    <Tag color="green" size="small">已验证</Tag>
+                    <Tag color="green" style={{ fontSize: '12px' }}>已验证</Tag>
                   )}
                 </Space>
               </Descriptions.Item>

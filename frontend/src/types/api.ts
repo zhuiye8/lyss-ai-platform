@@ -30,7 +30,7 @@ export namespace AuthAPI {
     password: string;
   }
 
-  // 登录响应
+  // 登录响应（前端使用的格式）
   export interface LoginResponse {
     user: {
       id: string;
@@ -44,6 +44,23 @@ export namespace AuthAPI {
     access_token: string;
     refresh_token: string;
     expires_in: number;
+  }
+
+  // 后端实际返回的登录响应格式
+  export interface BackendLoginResponse {
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    refresh_token: string;
+    user_info: {
+      user_id: string;
+      email: string;
+      tenant_id: string;
+      role: string;
+      is_active: boolean;
+      last_login_at?: string;
+      // 注意：后端还包含hashed_password，但前端不应该使用
+    };
   }
 
   // 刷新令牌请求

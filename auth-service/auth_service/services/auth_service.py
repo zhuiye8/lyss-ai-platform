@@ -87,13 +87,9 @@ class AuthenticationService:
                     details={"user_id": user_info.user_id},
                 )
 
-            # 4. 获取用户密码哈希并验证
-            password_hash = await tenant_client.get_user_password_hash(
-                user_info.user_id, request_id
-            )
-
-            if not password_manager.verify_password(password, password_hash):
-                # 密码错误，记录失败日志
+            # 4. 验证密码（使用从verify接口获取的密码哈希）
+            if not password_manager.verify_password(password, user_info.hashed_password):
+                # 密码错误，记录失败日志和安全事件
                 logger.log_auth_event(
                     event_type="login_failed",
                     message="密码验证失败",
@@ -104,6 +100,19 @@ class AuthenticationService:
                     success=False,
                     error_code="3004",
                 )
+                
+                # 记录安全事件用于监控
+                logger.log_security_event(
+                    event_type="invalid_password_attempt",
+                    message=f"用户 {user_info.email} 密码验证失败",
+                    user_id=user_info.user_id,
+                    ip_address=client_ip,
+                    additional_data={
+                        "username_attempt": username,
+                        "user_agent": user_agent,
+                    }
+                )
+                
                 raise InvalidCredentialsError()
 
             # 5. 生成JWT令牌
@@ -120,8 +129,15 @@ class AuthenticationService:
             # 6. 更新用户最后登录时间（异步，不影响登录流程）
             await tenant_client.update_last_login(user_info.user_id, request_id)
 
-            # 7. 重置该IP的速率限制计数器
-            await rate_limiter.reset_rate_limit(client_ip)
+            # 7. 重置该IP的速率限制计数器（Redis连接失败时忽略）
+            try:
+                await rate_limiter.reset_rate_limit(client_ip)
+            except Exception as e:
+                logger.warning(
+                    f"重置速率限制失败: {str(e)}",
+                    operation="reset_rate_limit",
+                    data={"client_ip": client_ip, "error": str(e)}
+                )
 
             # 8. 记录成功登录日志
             logger.log_auth_event(
@@ -134,13 +150,24 @@ class AuthenticationService:
                 success=True,
             )
 
-            # 9. 返回令牌响应
+            # 9. 创建安全的用户信息字典（完全不包含hashed_password字段）
+            safe_user_info = {
+                "user_id": user_info.user_id,
+                "email": user_info.email,
+                "tenant_id": user_info.tenant_id,
+                "role": user_info.role,
+                "is_active": user_info.is_active,
+                "last_login_at": user_info.last_login_at,
+                # 注意：完全不包含 hashed_password 字段
+            }
+
+            # 10. 返回令牌响应
             return TokenResponse(
                 access_token=access_token,
                 token_type="bearer",
                 expires_in=settings.access_token_expire_minutes * 60,  # 转换为秒
                 refresh_token=refresh_token,
-                user_info=user_info,
+                user_info=safe_user_info,
             )
 
         except (UserNotFoundError, InvalidCredentialsError):
@@ -179,12 +206,17 @@ class AuthenticationService:
             token_payload = self.token_manager.verify_token(refresh_token)
 
             # 2. 检查是否为刷新令牌
-            if hasattr(token_payload, "token_type") and getattr(token_payload, "token_type") != "refresh":
-                # 如果令牌中没有token_type字段，可能是访问令牌被误用
+            token_type = getattr(token_payload, "token_type", None)
+            if token_type and token_type != "refresh":
+                # 明确标识的非刷新令牌被误用
                 logger.warning(
-                    "尝试使用访问令牌进行刷新",
+                    f"尝试使用{token_type}令牌进行刷新",
                     operation="token_refresh",
-                    data={"token_jti": token_payload.jti},
+                    data={"token_jti": token_payload.jti, "token_type": token_type},
+                )
+                raise TokenInvalidError(
+                    message="无效的令牌类型，刷新操作需要使用刷新令牌",
+                    details={"expected": "refresh", "actual": token_type},
                 )
 
             # 3. 检查令牌是否在黑名单中

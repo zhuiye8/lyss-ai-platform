@@ -97,7 +97,7 @@ export type ID = string;
 export type Status = 'active' | 'inactive' | 'pending' | 'disabled';
 
 // 通用角色类型
-export type Role = 'admin' | 'user' | 'viewer';
+export type Role = 'admin' | 'user' | 'viewer' | 'tenant_admin' | 'end_user';
 
 // 环境类型
 export type Environment = 'development' | 'staging' | 'production';

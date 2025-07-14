@@ -83,7 +83,7 @@ class UserRepository(BaseRepository):
         if tenant_id is not None:
             conditions.append(User.tenant_id == tenant_id)
         
-        query = select(User).where(and_(*conditions))
+        query = select(User).options(selectinload(User.role)).where(and_(*conditions))
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
@@ -401,3 +401,19 @@ class UserRepository(BaseRepository):
         updates = {"is_active": False}
         result = await self.update(user_id, updates)
         return result is not None
+    
+    async def update_last_login(self, user_id: uuid.UUID) -> Optional[User]:
+        """
+        更新用户最后登录时间
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            更新后的用户对象，如果用户不存在则返回None
+        """
+        from datetime import datetime, timezone
+        
+        # 更新最后登录时间为当前UTC时间
+        updates = {"last_login_at": datetime.now(timezone.utc)}
+        return await self.update(user_id, updates)

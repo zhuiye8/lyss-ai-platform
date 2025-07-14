@@ -22,7 +22,7 @@ export class TenantService {
     status?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
-  }): Promise<ApiResponse<PaginationResponse<Tenant>>> {
+  }): Promise<ApiResponse<PaginatedResponse<Tenant>>> {
     const response = await httpClient.get(API_ENDPOINTS.TENANTS.LIST, { params });
     return response.data;
   }
@@ -90,7 +90,7 @@ export class TenantService {
     format?: 'csv' | 'xlsx';
     filters?: Record<string, any>;
   }): Promise<Blob> {
-    const response = await httpClient.post(
+    const response = await httpClient.getInstance().post(
       '/api/v1/admin/tenants/export',
       params,
       { responseType: 'blob' }

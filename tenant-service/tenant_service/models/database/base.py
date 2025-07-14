@@ -8,7 +8,7 @@ SQLAlchemy基础模型
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List
-from sqlalchemy import DateTime, String, Boolean, text, UUID
+from sqlalchemy import DateTime, String, Boolean, text, UUID, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -76,6 +76,7 @@ class TenantAwareModel(BaseModel):
     # 租户ID（必需字段，用于数据隔离）
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="租户ID"

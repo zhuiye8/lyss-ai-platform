@@ -280,7 +280,16 @@ class RateLimiter:
 
         except Exception as e:
             # Redis错误时不应阻止正常业务，记录日志并允许通过
-            # TODO: 添加日志记录
+            from ..utils.logging import logger
+            logger.warning(
+                f"速率限制检查失败，Redis错误: {str(e)}",
+                operation="rate_limit_check",
+                data={
+                    "identifier": identifier,
+                    "error": str(e),
+                    "fallback_behavior": "allow_through"
+                }
+            )
             return False, 0
 
     async def reset_rate_limit(self, identifier: str) -> bool:
@@ -333,7 +342,21 @@ class TokenBlacklist:
             bool: 令牌是否被拉黑
         """
         key = f"blacklist:token:{jti}"
-        return await self.redis.exists(key)
+        try:
+            return await self.redis.exists(key)
+        except Exception as e:
+            # Redis错误时保守处理，假设令牌有效，记录错误日志
+            from ..utils.logging import logger
+            logger.warning(
+                f"黑名单检查失败，Redis错误: {str(e)}",
+                operation="blacklist_check",
+                data={
+                    "jti": jti,
+                    "error": str(e),
+                    "fallback_behavior": "assume_valid"
+                }
+            )
+            return False
 
 
 # 全局Redis客户端实例

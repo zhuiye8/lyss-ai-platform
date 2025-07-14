@@ -12,6 +12,7 @@ export interface SupplierCredential {
   name: string;
   api_key_preview?: string; // 脱敏显示
   api_key_full?: string; // 完整密钥（仅在需要时获取）
+  api_key?: string; // 完整密钥（用于后端交互）
   api_endpoint?: string;
   model_config?: Record<string, any>;
   is_active: boolean;

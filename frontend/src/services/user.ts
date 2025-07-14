@@ -4,8 +4,7 @@
  */
 
 import httpClient from './http';
-import { UserAPI } from '@/types/api';
-import { CreateUserRequest, UpdateUserRequest } from '@/types/user';
+import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user';
 import { ApiResponse, PaginatedResponse, PaginationParams } from '@/types/common';
 
 export class UserService {
@@ -20,9 +19,9 @@ export class UserService {
     status?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
-  }): Promise<ApiResponse<PaginatedResponse<UserAPI.User>>> {
+  }): Promise<ApiResponse<PaginatedResponse<User>>> {
     try {
-      const response = await httpClient.get<ApiResponse<PaginatedResponse<UserAPI.User>>>(
+      const response = await httpClient.get<ApiResponse<PaginatedResponse<User>>>(
         this.BASE_URL,
         { params }
       );
@@ -36,9 +35,9 @@ export class UserService {
   /**
    * 获取单个用户详情
    */
-  static async getUser(id: string): Promise<ApiResponse<UserAPI.User>> {
+  static async getUser(id: string): Promise<ApiResponse<User>> {
     try {
-      const response = await httpClient.get<ApiResponse<UserAPI.User>>(
+      const response = await httpClient.get<ApiResponse<User>>(
         `${this.BASE_URL}/${id}`
       );
       return response;
@@ -51,9 +50,9 @@ export class UserService {
   /**
    * 创建用户
    */
-  static async createUser(data: CreateUserRequest): Promise<ApiResponse<UserAPI.User>> {
+  static async createUser(data: CreateUserRequest): Promise<ApiResponse<User>> {
     try {
-      const response = await httpClient.post<ApiResponse<UserAPI.User>>(
+      const response = await httpClient.post<ApiResponse<User>>(
         this.BASE_URL,
         data
       );
@@ -67,9 +66,9 @@ export class UserService {
   /**
    * 更新用户
    */
-  static async updateUser(id: string, data: UpdateUserRequest): Promise<ApiResponse<UserAPI.User>> {
+  static async updateUser(id: string, data: UpdateUserRequest): Promise<ApiResponse<User>> {
     try {
-      const response = await httpClient.put<ApiResponse<UserAPI.User>>(
+      const response = await httpClient.put<ApiResponse<User>>(
         `${this.BASE_URL}/${id}`,
         data
       );

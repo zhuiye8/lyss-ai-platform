@@ -79,6 +79,7 @@ class Tenant(BaseModel):
     users: Mapped[list["User"]] = relationship(
         "User", 
         back_populates="tenant",
+        foreign_keys="[User.tenant_id]",
         cascade="all, delete-orphan",
         lazy="select"
     )
@@ -86,6 +87,14 @@ class Tenant(BaseModel):
     # 供应商凭证关系
     supplier_credentials: Mapped[list["SupplierCredential"]] = relationship(
         "SupplierCredential",
+        back_populates="tenant",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    # 工具配置关系
+    tool_configs: Mapped[list["TenantToolConfig"]] = relationship(
+        "TenantToolConfig",
         back_populates="tenant",
         cascade="all, delete-orphan",
         lazy="select"

@@ -30,7 +30,41 @@ export class AuthService {
         }
       );
       
-      return response.data;
+      // HTTP拦截器已经提取了ApiResponse.data，所以response.data直接是登录数据
+      const loginData = response.data as AuthAPI.BackendLoginResponse;
+      
+      // 检查登录数据是否完整
+      if (!loginData || !loginData.user_info) {
+        console.error('后端返回数据格式错误:', loginData);
+        throw new Error('后端返回的数据格式不正确');
+      }
+      
+      // 提取用户信息
+      const userInfo = loginData.user_info;
+      
+      // 将后端数据转换为前端期望的格式
+      const transformedData: ApiResponse<AuthAPI.LoginResponse> = {
+        success: true,
+        data: {
+          user: {
+            id: userInfo.user_id,
+            email: userInfo.email,
+            name: userInfo.email.split('@')[0], // 从邮箱提取用户名
+            role: userInfo.role,
+            tenant_id: userInfo.tenant_id,
+            is_active: userInfo.is_active,
+            avatar: undefined, // 后端暂时没有头像字段
+          },
+          access_token: loginData.access_token,
+          refresh_token: loginData.refresh_token,
+          expires_in: loginData.expires_in,
+        },
+        message: '登录成功',
+        request_id: 'extracted-by-interceptor',
+        timestamp: new Date().toISOString()
+      };
+      
+      return transformedData;
     } catch (error) {
       console.error('登录失败:', error);
       throw error;

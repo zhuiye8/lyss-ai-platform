@@ -126,6 +126,15 @@ class User(TenantAwareModel):
         lazy="select"
     )
     
+    # 用户偏好关系
+    preferences: Mapped["UserPreference"] = relationship(
+        "UserPreference",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
     @property
     def full_name(self) -> str:
         """获取全名"""
