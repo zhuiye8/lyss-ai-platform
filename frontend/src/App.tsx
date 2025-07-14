@@ -17,6 +17,11 @@ import DashboardPage from '@/pages/dashboard';
 import ChatPage from '@/pages/chat';
 import AdminLayout from '@/components/layout/AdminLayout';
 
+// 管理页面
+import TenantsPage from '@/pages/admin/tenants';
+import UsersPage from '@/pages/admin/users';
+import SuppliersPage from '@/pages/admin/suppliers';
+
 // 通用组件
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 
@@ -109,27 +114,33 @@ const App: React.FC = () => {
               <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
               <Route path={ROUTES.FORBIDDEN} element={<ForbiddenPage />} />
               
-              {/* 受保护的路由 */}
-              <Route 
-                path={ROUTES.DASHBOARD} 
-                element={
-                  <ProtectedRoute>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                } 
-              />
-              
               {/* 管理员路由 */}
               <Route 
-                path="/admin/*" 
+                path="/admin" 
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route path="tenants" element={<TenantsPage />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="suppliers" element={<SuppliersPage />} />
+                <Route index element={<Navigate to="/admin/tenants" replace />} />
+              </Route>
               
-              {/* 用户路由 */}
+              {/* 用户功能路由 */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                } 
+              >
+                <Route index element={<DashboardPage />} />
+              </Route>
+              
               <Route 
                 path="/chat" 
                 element={
@@ -137,7 +148,9 @@ const App: React.FC = () => {
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<ChatPage />} />
+              </Route>
               
               <Route 
                 path="/conversations" 
@@ -146,7 +159,9 @@ const App: React.FC = () => {
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<div>对话历史页面（待实现）</div>} />
+              </Route>
               
               <Route 
                 path="/memory" 
@@ -155,7 +170,9 @@ const App: React.FC = () => {
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<div>记忆管理页面（待实现）</div>} />
+              </Route>
               
               <Route 
                 path="/profile" 
@@ -164,7 +181,9 @@ const App: React.FC = () => {
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<div>个人中心页面（待实现）</div>} />
+              </Route>
               
               <Route 
                 path="/settings" 
@@ -173,7 +192,9 @@ const App: React.FC = () => {
                     <AdminLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<div>设置页面（待实现）</div>} />
+              </Route>
               
               {/* 根路径重定向 */}
               <Route 

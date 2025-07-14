@@ -151,9 +151,9 @@ const AdminLayout: React.FC = () => {
   };
 
   // 生成面包屑数据
-  const generateBreadcrumbs = () => {
+  const generateBreadcrumbs = (): Array<{ title: React.ReactNode; path: string }> => {
     const pathSegments = location.pathname.split('/').filter(Boolean);
-    const breadcrumbs = [{ title: <HomeOutlined />, path: '/' }];
+    const breadcrumbs: Array<{ title: React.ReactNode; path: string }> = [{ title: <HomeOutlined />, path: '/' }];
 
     let currentPath = '';
     for (const segment of pathSegments) {
@@ -221,7 +221,7 @@ const AdminLayout: React.FC = () => {
       onClick: () => navigate(ROUTES.SETTINGS),
     },
     {
-      type: 'divider',
+      type: 'divider' as const,
     },
     {
       key: 'logout',
@@ -243,7 +243,7 @@ const AdminLayout: React.FC = () => {
   };
 
   // 转换为 Ant Design Menu 的数据结构
-  const convertToMenuItems = (items: MenuItem[]) => {
+  const convertToMenuItems = (items: MenuItem[]): any[] => {
     return items.map(item => {
       if (item.children) {
         return {

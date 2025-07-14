@@ -102,12 +102,13 @@ const SuppliersPage: React.FC = () => {
       });
       
       if (response.success && response.data) {
-        setSuppliers(response.data.items);
+        const data = response.data;
+        setSuppliers(data.items);
         setPagination(prev => ({
           ...prev,
-          current: response.data.pagination.page,
-          pageSize: response.data.pagination.page_size,
-          total: response.data.pagination.total_items,
+          current: data.pagination.page,
+          pageSize: data.pagination.page_size,
+          total: data.pagination.total_items,
         }));
       }
     } catch (error) {

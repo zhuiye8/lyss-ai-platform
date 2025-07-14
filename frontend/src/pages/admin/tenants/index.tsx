@@ -44,7 +44,6 @@ import { TenantService } from '@/services/tenant';
 import { Tenant, CreateTenantRequest, UpdateTenantRequest } from '@/types/tenant';
 import { PAGINATION } from '@/utils/constants';
 import { handleApiError } from '@/utils/errorHandler';
-import { useAuth } from '@/store/auth';
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -57,6 +56,16 @@ interface TenantStats {
   last_active_at: string;
 }
 
+// 扩展Tenant类型以包含页面所需的额外字段
+interface ExtendedTenant extends Tenant {
+  status: 'active' | 'inactive' | 'pending';
+  is_default?: boolean;
+  user_count?: number;
+  max_users?: number;
+  max_storage?: number;
+  last_active_at?: string;
+}
+
 interface TableParams {
   page?: number;
   page_size?: number;
@@ -67,7 +76,7 @@ interface TableParams {
 }
 
 const TenantsPage: React.FC = () => {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenants, setTenants] = useState<ExtendedTenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -86,14 +95,13 @@ const TenantsPage: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
-  const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
+  const [currentTenant, setCurrentTenant] = useState<ExtendedTenant | null>(null);
   const [tenantStats, setTenantStats] = useState<TenantStats | null>(null);
   
   // Form 实例
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   
-  const { user } = useAuth();
 
   /**
    * 加载租户数据
@@ -110,13 +118,14 @@ const TenantsPage: React.FC = () => {
         sort_order: params.sort_order,
       });
       
-      if (response.success) {
-        setTenants(response.data.items);
+      if (response.success && response.data) {
+        const data = response.data;
+        setTenants(data.items as ExtendedTenant[]);
         setPagination(prev => ({
           ...prev,
-          current: response.data.pagination.page,
-          pageSize: response.data.pagination.page_size,
-          total: response.data.pagination.total_items,
+          current: data.pagination.page,
+          pageSize: data.pagination.page_size,
+          total: data.pagination.total_items,
         }));
       }
     } catch (error) {
@@ -136,13 +145,13 @@ const TenantsPage: React.FC = () => {
   /**
    * 表格列定义
    */
-  const columns: ColumnsType<Tenant> = [
+  const columns: ColumnsType<ExtendedTenant> = [
     {
       title: '租户名称',
       dataIndex: 'name',
       key: 'name',
       sorter: true,
-      render: (text: string, record: Tenant) => (
+      render: (text: string, record: ExtendedTenant) => (
         <Space>
           <strong>{text}</strong>
           {record.is_default && <Tag color="gold">默认</Tag>}
@@ -213,7 +222,7 @@ const TenantsPage: React.FC = () => {
       title: '操作',
       key: 'actions',
       width: 200,
-      render: (_, record: Tenant) => (
+      render: (_, record: ExtendedTenant) => (
         <Space size="middle">
           <Tooltip title="查看详情">
             <Button
@@ -287,14 +296,14 @@ const TenantsPage: React.FC = () => {
   /**
    * 查看租户详情
    */
-  const handleViewTenant = async (tenant: Tenant) => {
+  const handleViewTenant = async (tenant: ExtendedTenant) => {
     setCurrentTenant(tenant);
     setDetailDrawerVisible(true);
     
     // 加载统计信息
     try {
       const response = await TenantService.getTenantStats(tenant.id);
-      if (response.success) {
+      if (response.success && response.data) {
         setTenantStats(response.data);
       }
     } catch (error) {
@@ -312,7 +321,7 @@ const TenantsPage: React.FC = () => {
   /**
    * 编辑租户
    */
-  const handleEditTenant = (tenant: Tenant) => {
+  const handleEditTenant = (tenant: ExtendedTenant) => {
     setCurrentTenant(tenant);
     editForm.setFieldsValue({
       name: tenant.name,
@@ -439,7 +448,7 @@ const TenantsPage: React.FC = () => {
     onChange: (newSelectedRowKeys: React.Key[]) => {
       setSelectedRowKeys(newSelectedRowKeys);
     },
-    getCheckboxProps: (record: Tenant) => ({
+    getCheckboxProps: (record: ExtendedTenant) => ({
       disabled: record.is_default, // 默认租户不允许选择
     }),
   };

@@ -23,21 +23,17 @@ import {
   Row,
   Col,
   Typography,
-  Badge,
   Alert,
   Tooltip,
-  DatePicker,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
-  SearchOutlined,
   EyeOutlined,
   UserOutlined,
   MailOutlined,
-  PhoneOutlined,
   LockOutlined,
   UnlockOutlined,
   KeyOutlined,
@@ -47,7 +43,6 @@ import dayjs from 'dayjs';
 
 import { UserService } from '@/services/user';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/types/user';
-import { PaginatedResponse } from '@/types/common';
 import { PAGINATION, USER_ROLES, USER_STATUS } from '@/utils/constants';
 import { handleApiError } from '@/utils/errorHandler';
 import { useAuth } from '@/store/auth';
@@ -114,13 +109,14 @@ const UsersPage: React.FC = () => {
         sort_order: params.sort_order,
       });
       
-      if (response.success) {
-        setUsers(response.data.items);
+      if (response.success && response.data) {
+        const data = response.data;
+        setUsers(data.items);
         setPagination(prev => ({
           ...prev,
-          current: response.data.pagination.page,
-          pageSize: response.data.pagination.page_size,
-          total: response.data.pagination.total_items,
+          current: data.pagination.page,
+          pageSize: data.pagination.page_size,
+          total: data.pagination.total_items,
         }));
       }
     } catch (error) {
@@ -192,7 +188,7 @@ const UsersPage: React.FC = () => {
         value: key,
       })),
       render: (role: string) => {
-        const roleConfig = USER_ROLES[role] || USER_ROLES.user;
+        const roleConfig = USER_ROLES[role as keyof typeof USER_ROLES] || USER_ROLES.user;
         return (
           <Tag color={roleConfig.color}>
             {roleConfig.label}
@@ -209,7 +205,9 @@ const UsersPage: React.FC = () => {
         value: key,
       })),
       render: (status: string, record: User) => {
-        const statusConfig = USER_STATUS[status] || USER_STATUS.inactive;
+        // 使用is_active字段来确定状态
+        const actualStatus = record.is_active ? 'active' : 'inactive';
+        const statusConfig = USER_STATUS[actualStatus] || USER_STATUS.inactive;
         return (
           <Space>
             <Tag color={statusConfig.color}>
