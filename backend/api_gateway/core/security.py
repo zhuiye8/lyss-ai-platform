@@ -50,7 +50,12 @@ class JWTManager:
             payload = jwt.decode(
                 token,
                 self.secret_key,
-                algorithms=[self.algorithm]
+                algorithms=[self.algorithm],
+                # 禁用audience和issuer验证，因为API Gateway只需要验证签名和基本字段
+                options={
+                    "verify_aud": False,
+                    "verify_iss": False
+                }
             )
             
             # 验证必需字段
@@ -131,11 +136,11 @@ class AuthHeaders:
             认证头部字典
         """
         return {
-            "X-User-ID": user_info["user_id"],
-            "X-Tenant-ID": user_info["tenant_id"],
-            "X-User-Role": user_info["role"],
+            "X-User-ID": user_info.get("user_id", ""),
+            "X-Tenant-ID": user_info.get("tenant_id", ""),
+            "X-User-Role": user_info.get("role", ""),
             "X-Request-ID": request_id,
-            "X-User-Email": user_info["email"]
+            "X-User-Email": user_info.get("email", "")
         }
     
     @staticmethod

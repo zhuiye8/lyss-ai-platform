@@ -110,22 +110,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_info = user_info
             request.state.authenticated = True
             
-            # 生成认证头部并注入到请求头
-            auth_headers = AuthHeaders.generate_auth_headers(user_info, request_id)
-            
-            # 创建新的请求头
-            new_headers = dict(request.headers)
-            new_headers.update(auth_headers)
-            # 保留原始Authorization头部
-            new_headers["Authorization"] = authorization
-            
-            # 更新请求头
-            request._headers = new_headers
-            request.scope["headers"] = [
-                (key.encode(), value.encode()) for key, value in new_headers.items()
-            ]
+            # 记录认证成功，但不在这里修改请求头
+            # 让proxy_service负责添加认证头部
             
         except Exception as e:
+            # 提取具体的错误信息
+            error_message = str(e)
+            if hasattr(e, 'detail'):
+                error_message = str(e.detail)
+            elif hasattr(e, 'message'):
+                error_message = str(e.message)
+            
             # 记录认证失败事件
             log_auth_event(
                 logger,
@@ -138,12 +133,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 data={
                     "path": path,
                     "method": request.method,
-                    "error": str(e)
+                    "error": error_message,
+                    "exception_type": type(e).__name__
                 }
             )
             
             return await self._create_auth_error_response(
-                f"认证失败: {str(e)}",
+                f"认证失败: {error_message}",
                 "2003",
                 request_id,
                 {"path": path}

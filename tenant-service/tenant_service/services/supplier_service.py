@@ -91,6 +91,11 @@ class SupplierService:
             if existing_credential:
                 raise ValueError("该供应商配置已存在")
             
+            # 处理默认base_url（如果没有提供则使用配置中的默认值）
+            final_base_url = request_data.base_url
+            if not final_base_url and provider_info.get("base_url"):
+                final_base_url = provider_info["base_url"]
+            
             # 使用加密管理器存储凭证
             credential_id = await credential_manager.store_encrypted_credential(
                 self.db,
@@ -98,7 +103,7 @@ class SupplierService:
                 request_data.provider_name,
                 request_data.display_name,
                 request_data.api_key,
-                request_data.base_url,
+                final_base_url,
                 request_data.model_configs or {}
             )
             
@@ -522,9 +527,15 @@ class SupplierService:
                             "Content-Type": "application/json",
                             "anthropic-version": "2023-06-01"
                         }
+                    elif provider_name == "deepseek":
+                        test_url = f"{base_url}/models"
+                        headers = {"Authorization": f"Bearer {api_key}"}
+                    elif provider_name == "google":
+                        test_url = f"{base_url}/v1/models"
+                        headers = {"Authorization": f"Bearer {api_key}"}
                     else:
                         # 自定义供应商，只做基础连接测试
-                        test_url = base_url
+                        test_url = base_url or "https://api.example.com"
                         headers = {"Authorization": f"Bearer {api_key}"}
                     
                     response = await client.get(test_url, headers=headers)

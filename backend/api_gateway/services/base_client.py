@@ -241,6 +241,9 @@ class BaseServiceClient:
         Raises:
             DownstreamServiceError: 透传的下游服务错误
         """
+        # 初始化默认错误文本
+        error_text = response.text or "未知错误"
+        
         try:
             # 尝试解析下游服务的错误响应
             error_data = response.json()

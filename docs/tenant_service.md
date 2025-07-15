@@ -79,8 +79,8 @@ CREATE TABLE roles (
 CREATE TABLE supplier_credentials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    provider_name VARCHAR(50) NOT NULL, -- 'openai', 'anthropic', 'google'
-    display_name VARCHAR(100),
+    provider_name VARCHAR(50) NOT NULL, -- 'openai', 'anthropic', 'google', 'deepseek', 'custom'
+    display_name VARCHAR(100) NOT NULL,
     encrypted_api_key BYTEA NOT NULL, -- 使用pgcrypto加密
     base_url VARCHAR(255),
     model_configs JSONB DEFAULT '{}',
@@ -89,6 +89,60 @@ CREATE TABLE supplier_credentials (
     updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(tenant_id, provider_name, display_name)
 );
+```
+
+#### 支持的供应商配置 (SUPPORTED_PROVIDERS)
+```python
+SUPPORTED_PROVIDERS = {
+    "openai": {
+        "display_name": "OpenAI",
+        "base_url": "https://api.openai.com/v1", 
+        "default_models": ["gpt-4", "gpt-3.5-turbo"],
+        "api_key_pattern": r"^sk-[A-Za-z0-9]{48}$",
+        "test_endpoint": "/models",
+        "test_method": "model_list"
+    },
+    "anthropic": {
+        "display_name": "Anthropic",
+        "base_url": "https://api.anthropic.com",
+        "default_models": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+        "api_key_pattern": r"^sk-ant-[A-Za-z0-9\-_]{95}$",
+        "test_endpoint": "/v1/messages",
+        "test_method": "simple_message"
+    },
+    "google": {
+        "display_name": "Google AI",
+        "base_url": "https://generativelanguage.googleapis.com",
+        "default_models": ["gemini-pro", "gemini-pro-vision"],
+        "api_key_pattern": r"^[A-Za-z0-9\-_]{39}$",
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list"
+    },
+    "deepseek": {
+        "display_name": "DeepSeek",
+        "base_url": "https://api.deepseek.com",
+        "default_models": ["deepseek-chat", "deepseek-coder"],
+        "api_key_pattern": r"^sk-[A-Za-z0-9]{48}$",
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list"
+    },
+    "azure": {
+        "display_name": "Azure OpenAI",
+        "base_url": None,  # 需要自定义
+        "default_models": ["gpt-4", "gpt-35-turbo"],
+        "api_key_pattern": r"^[A-Za-z0-9]{32}$",
+        "test_endpoint": "/openai/deployments",
+        "test_method": "deployment_list"
+    },
+    "custom": {
+        "display_name": "自定义供应商",
+        "base_url": None,  # 需要自定义
+        "default_models": [],
+        "api_key_pattern": None,  # 不验证格式
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list"
+    }
+}
 ```
 
 ### 工具配置管理表结构
@@ -125,6 +179,320 @@ CREATE TABLE user_preferences (
     updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(user_id, tenant_id)
 );
+```
+
+## 🧪 供应商凭证测试架构
+
+### 🎯 设计原则
+1. **保存前测试**: 所有凭证在保存前必须通过连接测试
+2. **双重接口**: 提供独立的测试接口和保存接口 
+3. **错误详情**: 返回详细的错误信息帮助用户排查问题
+4. **超时控制**: 所有测试请求都有合理的超时限制
+5. **安全第一**: 测试过程中API密钥不记录到日志
+
+### 🔧 技术实现策略
+
+#### 阶段1: Python原生实现（当前实施）
+```python
+# 位置: tenant-service/tenant_service/services/supplier_testing.py
+class SupplierTester:
+    def __init__(self):
+        self.timeout = 10  # 10秒超时
+        self.test_methods = {
+            "openai": self._test_openai,
+            "anthropic": self._test_anthropic,
+            "google": self._test_google_ai,
+            "azure": self._test_azure_openai,
+            "cohere": self._test_cohere
+        }
+    
+    async def test_supplier_connection(self, provider: str, api_key: str, base_url: str = None) -> TestResult:
+        """统一的供应商连接测试接口"""
+        if provider not in self.test_methods:
+            raise ValueError(f"不支持的供应商: {provider}")
+        
+        start_time = time.time()
+        try:
+            result = await self.test_methods[provider](api_key, base_url)
+            response_time = int((time.time() - start_time) * 1000)
+            return TestResult(
+                success=True,
+                provider=provider,
+                response_time_ms=response_time,
+                **result
+            )
+        except Exception as e:
+            return TestResult(
+                success=False,
+                provider=provider,
+                error_message=str(e),
+                error_type=self._categorize_error(e)
+            )
+```
+
+#### 阶段2: EINO框架集成（长期规划）
+```go
+// 位置: eino-service/internal/supplier/tester.go
+type SupplierTester struct {
+    config *Config
+    logger *log.Logger
+}
+
+func (t *SupplierTester) TestConnection(ctx context.Context, req *TestRequest) (*TestResult, error) {
+    // 使用EINO的ChatModel抽象进行测试
+    model, err := t.createChatModel(req.Provider, req.APIKey, req.BaseURL)
+    if err != nil {
+        return nil, err
+    }
+    
+    // 发送测试消息
+    result, err := model.Generate(ctx, []*Message{
+        SystemMessage("You are a test assistant."),
+        UserMessage("Reply with 'OK' if you received this message."),
+    })
+    
+    return &TestResult{
+        Success: err == nil,
+        Provider: req.Provider,
+        ResponseTime: time.Since(start),
+        TestMethod: "simple_chat",
+    }, nil
+}
+```
+
+### 📋 具体测试方法
+
+#### OpenAI API 测试
+```python
+async def _test_openai(self, api_key: str, base_url: str = None) -> dict:
+    """测试OpenAI API连接"""
+    base_url = base_url or "https://api.openai.com/v1"
+    
+    async with httpx.AsyncClient(timeout=self.timeout) as client:
+        # 方法1: 获取模型列表（推荐）
+        response = await client.get(
+            f"{base_url}/models",
+            headers={"Authorization": f"Bearer {api_key}"}
+        )
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            models = [model["id"] for model in models_data.get("data", [])]
+            return {
+                "test_method": "model_list",
+                "available_models": models[:10],  # 返回前10个模型
+                "endpoint_tested": f"{base_url}/models",
+                "status_code": 200
+            }
+        else:
+            self._handle_error_response(response, "openai")
+```
+
+#### Anthropic API 测试  
+```python
+async def _test_anthropic(self, api_key: str, base_url: str = None) -> dict:
+    """测试Anthropic API连接"""
+    base_url = base_url or "https://api.anthropic.com"
+    
+    async with httpx.AsyncClient(timeout=self.timeout) as client:
+        # 发送简单消息测试
+        response = await client.post(
+            f"{base_url}/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-3-haiku-20240307",
+                "max_tokens": 10,
+                "messages": [{"role": "user", "content": "Hello"}]
+            }
+        )
+        
+        if response.status_code == 200:
+            return {
+                "test_method": "simple_message",
+                "model_tested": "claude-3-haiku-20240307",
+                "endpoint_tested": f"{base_url}/v1/messages",
+                "status_code": 200
+            }
+        else:
+            self._handle_error_response(response, "anthropic")
+```
+
+#### Google AI API 测试
+```python
+async def _test_google_ai(self, api_key: str, base_url: str = None) -> dict:
+    """测试Google AI API连接"""
+    base_url = base_url or "https://generativelanguage.googleapis.com"
+    
+    async with httpx.AsyncClient(timeout=self.timeout) as client:
+        # 获取模型列表
+        response = await client.get(
+            f"{base_url}/v1/models",
+            params={"key": api_key}
+        )
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            models = [model["name"] for model in models_data.get("models", [])]
+            return {
+                "test_method": "model_list",
+                "available_models": models[:10],
+                "endpoint_tested": f"{base_url}/v1/models", 
+                "status_code": 200
+            }
+        else:
+            self._handle_error_response(response, "google")
+```
+
+#### DeepSeek API 测试
+```python
+async def _test_deepseek(self, api_key: str, base_url: str = None) -> dict:
+    """测试DeepSeek API连接"""
+    base_url = base_url or "https://api.deepseek.com"
+    
+    async with httpx.AsyncClient(timeout=self.timeout) as client:
+        # 方法1: 获取模型列表（推荐）
+        response = await client.get(
+            f"{base_url}/v1/models",
+            headers={"Authorization": f"Bearer {api_key}"}
+        )
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            models = [model["id"] for model in models_data.get("data", [])]
+            return {
+                "test_method": "model_list",
+                "available_models": models,
+                "default_model": "deepseek-chat",
+                "endpoint_tested": f"{base_url}/v1/models",
+                "status_code": 200
+            }
+        
+        # 方法2: 简单对话测试（如果模型列表失败）
+        response = await client.post(
+            f"{base_url}/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_tokens": 10
+            }
+        )
+        
+        if response.status_code == 200:
+            return {
+                "test_method": "simple_chat",
+                "model_tested": "deepseek-chat",
+                "endpoint_tested": f"{base_url}/v1/chat/completions",
+                "status_code": 200
+            }
+        else:
+            self._handle_error_response(response, "deepseek")
+```
+
+### 🚨 错误处理和分类
+
+#### 错误分类逻辑
+```python
+def _categorize_error(self, error: Exception) -> str:
+    """错误分类，帮助用户快速定位问题"""
+    if isinstance(error, httpx.TimeoutException):
+        return "timeout"
+    elif isinstance(error, httpx.ConnectError):
+        return "connection_failed"
+    elif hasattr(error, 'response'):
+        status_code = error.response.status_code
+        if status_code == 401:
+            return "authentication_failed"
+        elif status_code == 403:
+            return "permission_denied"
+        elif status_code == 404:
+            return "endpoint_not_found"
+        elif status_code == 429:
+            return "rate_limited"
+        elif status_code >= 500:
+            return "server_error"
+    return "unknown_error"
+
+def _handle_error_response(self, response: httpx.Response, provider: str):
+    """统一的错误处理"""
+    try:
+        error_data = response.json()
+        error_message = error_data.get('error', {}).get('message', 'Unknown error')
+    except:
+        error_message = response.text or f"HTTP {response.status_code}"
+    
+    raise SupplierTestError(
+        provider=provider,
+        status_code=response.status_code,
+        message=error_message,
+        error_type=self._categorize_error_by_code(response.status_code)
+    )
+```
+
+### 🔒 安全实施要点
+
+#### API密钥安全处理
+```python
+def _sanitize_for_logging(self, data: dict) -> dict:
+    """清理日志数据，确保API密钥不被记录"""
+    sanitized = data.copy()
+    for key in ["api_key", "key", "token", "secret"]:
+        if key in sanitized:
+            if isinstance(sanitized[key], str) and len(sanitized[key]) > 8:
+                sanitized[key] = sanitized[key][:4] + "***" + sanitized[key][-4:]
+            else:
+                sanitized[key] = "***masked***"
+    return sanitized
+
+async def test_with_audit_log(self, provider: str, api_key: str, tenant_id: str, user_id: str):
+    """带审计日志的测试方法"""
+    # 记录测试开始（不包含API密钥）
+    logger.info(
+        "开始供应商连接测试",
+        extra={
+            "operation": "supplier_test_start",
+            "provider": provider,
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+        }
+    )
+    
+    try:
+        result = await self.test_supplier_connection(provider, api_key)
+        
+        # 记录测试结果（不包含API密钥）
+        logger.info(
+            "供应商连接测试完成",
+            extra={
+                "operation": "supplier_test_complete",
+                "provider": provider,
+                "success": result.success,
+                "response_time_ms": result.response_time_ms,
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+            }
+        )
+        
+        return result
+    except Exception as e:
+        logger.error(
+            "供应商连接测试失败",
+            extra={
+                "operation": "supplier_test_failed",
+                "provider": provider,
+                "error": str(e),
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+            }
+        )
+        raise
 ```
 
 ## 🔐 供应商凭证加密机制
@@ -201,6 +569,38 @@ class CredentialManager:
         return result["api_key"] if result else None
 ```
 
+## 📋 字段标准化（前后端统一）
+
+### 供应商凭证创建请求 (SupplierCredentialCreateRequest)
+```json
+{
+  "provider_name": "deepseek",           // 供应商标识符（必填）
+  "display_name": "DeepSeek开发测试",    // 显示名称（必填）
+  "api_key": "sk-cc6f618f...",          // API密钥（必填）
+  "base_url": "https://api.deepseek.com", // 可选，默认使用供应商配置
+  "model_configs": {                     // 模型配置（可选）
+    "default_model": "deepseek-chat",
+    "supported_models": ["deepseek-chat", "deepseek-coder"],
+    "max_tokens": 4096,
+    "temperature": 0.7
+  }
+}
+```
+
+### 前端字段映射规则
+- 前端 `name` → 后端 `display_name`
+- 前端 `provider` → 后端 `provider_name`
+- 前端 `api_url` → 后端 `base_url`
+- 前端 `model_config` → 后端 `model_configs`
+
+### 支持的provider_name值
+- `openai` - OpenAI GPT系列
+- `anthropic` - Anthropic Claude系列
+- `google` - Google AI (Gemini)
+- `deepseek` - DeepSeek对话和代码模型
+- `azure` - Azure OpenAI服务
+- `custom` - 自定义供应商
+
 ## 📡 对外API接口
 
 ### 1. 租户管理API
@@ -261,7 +661,65 @@ Authorization: Bearer <tenant_admin_token>
 
 ### 3. 供应商凭证管理API
 
-#### 添加供应商凭证
+#### 🧪 测试供应商凭证（保存前测试）
+```http
+POST /api/v1/admin/suppliers/test
+Authorization: Bearer <tenant_admin_token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "provider_name": "openai",
+  "api_key": "sk-xxxxxxxxxxxxxxxxxxxxx",
+  "base_url": "https://api.openai.com/v1",
+  "test_config": {
+    "timeout": 10,
+    "test_message": "Hello, this is a test message."
+  }
+}
+```
+
+**响应 (成功):**
+```json
+{
+  "success": true,
+  "data": {
+    "connection_status": "success",
+    "provider_name": "openai",
+    "test_method": "model_list",
+    "response_time_ms": 456,
+    "available_models": [
+      "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"
+    ],
+    "test_details": {
+      "endpoint_tested": "https://api.openai.com/v1/models",
+      "status_code": 200
+    }
+  },
+  "message": "OpenAI连接测试成功，发现3个可用模型"
+}
+```
+
+**响应 (失败):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "4001",
+    "message": "API密钥无效或已过期",
+    "details": {
+      "provider_name": "openai",
+      "error_type": "authentication_failed",
+      "status_code": 401,
+      "provider_error": "Invalid API key provided"
+    }
+  }
+}
+```
+
+#### 添加供应商凭证（测试通过后保存）
 ```http
 POST /api/v1/admin/suppliers
 Authorization: Bearer <tenant_admin_token>
@@ -305,7 +763,7 @@ GET /api/v1/admin/suppliers
 Authorization: Bearer <tenant_admin_token>
 ```
 
-#### 测试供应商连接
+#### 测试已保存的供应商连接
 ```http
 POST /api/v1/admin/suppliers/{supplier_id}/test
 Authorization: Bearer <tenant_admin_token>

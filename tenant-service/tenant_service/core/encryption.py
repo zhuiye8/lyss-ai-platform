@@ -107,13 +107,14 @@ class CredentialManager:
                 ) RETURNING id
             """)
             
+            import json
             result = await session.execute(query, {
                 "tenant_id": tenant_id,
                 "provider_name": provider_name,
                 "display_name": display_name,
                 "encrypted_api_key": encrypted_key,
                 "base_url": base_url,
-                "model_configs": model_configs or {}
+                "model_configs": json.dumps(model_configs or {})
             })
             
             credential_id = result.scalar()

@@ -197,26 +197,10 @@ class ProxyService:
         Returns:
             目标路径
         """
-        # 对于Auth Service，保持完整的API路径
-        # 因为Auth Service期望 /api/v1/auth/login 而不是 /login
-        if route_config["service_name"] == "auth_service":
-            return original_path
-        
-        # 对于其他服务，提取相对路径
-        prefix = route_config["prefix"]
-        
-        # 如果路径完全匹配前缀，返回根路径
-        if original_path == prefix:
-            return "/"
-        
-        # 提取去除前缀后的路径
-        remaining_path = extract_path_without_prefix(original_path, prefix)
-        
-        # 确保路径以/开头
-        if not remaining_path.startswith("/"):
-            remaining_path = "/" + remaining_path
-        
-        return remaining_path
+        # 根据API Gateway规范文档，所有微服务都期望完整的API路径
+        # 包括 /api/v1 前缀，而不是相对路径
+        # 这样可以保持路由的一致性和可预测性
+        return original_path
     
     async def _prepare_request_headers(
         self,
@@ -243,10 +227,43 @@ class ProxyService:
         
         # 如果有用户信息，添加认证头部
         if user_info:
+            # 添加调试日志
+            logger.info(
+                f"准备认证头部，用户信息: {user_info}",
+                extra={
+                    "request_id": request_id,
+                    "user_info_keys": list(user_info.keys()) if user_info else [],
+                    "operation": "prepare_auth_headers"
+                }
+            )
+            
+            # 添加请求头调试日志
+            logger.info(
+                f"最终请求头内容",
+                extra={
+                    "request_id": request_id,
+                    "auth_headers": {
+                        "X-User-ID": user_info.get("user_id", ""),
+                        "X-Tenant-ID": user_info.get("tenant_id", ""),
+                        "X-User-Role": user_info.get("role", ""),
+                        "X-User-Email": user_info.get("email", "")
+                    },
+                    "operation": "prepare_auth_headers"
+                }
+            )
+            
             headers["X-User-ID"] = user_info.get("user_id", "")
             headers["X-Tenant-ID"] = user_info.get("tenant_id", "")
             headers["X-User-Role"] = user_info.get("role", "")
             headers["X-User-Email"] = user_info.get("email", "")
+        else:
+            logger.warning(
+                "用户信息为空，无法添加认证头部",
+                extra={
+                    "request_id": request_id,
+                    "operation": "prepare_auth_headers"
+                }
+            )
         
         # 移除可能导致问题的头部（不区分大小写）
         headers_to_remove = ["host", "content-length", "connection", "transfer-encoding"]

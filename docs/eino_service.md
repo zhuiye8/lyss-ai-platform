@@ -217,6 +217,35 @@ func (n *MemoryStorageNode) Execute(ctx context.Context, input map[string]any) (
 }
 ```
 
+## 🔄 需要Tenant Service实现的内部接口
+
+**重要提醒**：为了支持EINO服务的智能凭证管理，Tenant Service需要实现以下内部接口：
+
+### 1. 获取可用凭证列表
+```http
+GET /internal/suppliers/{tenant_id}/available?strategy=least_used&only_active=true&providers=openai,deepseek
+```
+
+### 2. 凭证连接测试
+```http
+POST /internal/suppliers/{credential_id}/test
+Content-Type: application/json
+
+{
+  "tenant_id": "tenant-uuid",
+  "test_type": "connection"
+}
+```
+
+### 3. 工具配置管理
+```http
+GET /internal/tool-configs/{tenant_id}/{workflow_name}/{tool_name}
+```
+
+**这些接口需要在Tenant Service中实现，用于EINO服务的凭证管理和工具配置。**
+
+---
+
 ## 📡 对外API接口
 
 ### 1. 简单对话接口
@@ -337,34 +366,149 @@ X-Tenant-ID: {tenant_id}
 
 ## 🔧 服务间集成
 
-### Tenant Service集成
+### Tenant Service集成（增强版凭证管理）
 ```go
 type TenantServiceClient struct {
     baseURL string
     client  *http.Client
 }
 
-// 获取供应商凭证
-func (c *TenantServiceClient) GetSupplierCredential(tenantID, provider string) (*SupplierCredential, error) {
-    url := fmt.Sprintf("%s/internal/suppliers/%s/%s", c.baseURL, tenantID, provider)
-    resp, err := c.client.Get(url)
+// 增强的供应商凭证结构
+type SupplierCredential struct {
+    ID           string                 `json:"id"`
+    TenantID     string                 `json:"tenant_id"`
+    Provider     string                 `json:"provider_name"`
+    DisplayName  string                 `json:"display_name"`
+    APIKey       string                 `json:"api_key"`
+    BaseURL      string                 `json:"base_url"`
+    ModelConfigs map[string]interface{} `json:"model_configs"`
+    IsActive     bool                   `json:"is_active"`
+    CreatedAt    time.Time              `json:"created_at"`
+    UpdatedAt    time.Time              `json:"updated_at"`
+}
+
+// 凭证选择策略
+type CredentialSelector struct {
+    Strategy string `json:"strategy"` // "first_available", "round_robin", "least_used"
+    Filters  struct {
+        OnlyActive bool     `json:"only_active"`
+        Providers  []string `json:"providers"`
+    } `json:"filters"`
+}
+
+// 获取租户的所有可用凭证
+func (c *TenantServiceClient) GetAvailableCredentials(tenantID string, selector *CredentialSelector) ([]*SupplierCredential, error) {
+    url := fmt.Sprintf("%s/internal/suppliers/%s/available", c.baseURL, tenantID)
+    
+    // 构建查询参数
+    req, err := http.NewRequest("GET", url, nil)
     if err != nil {
-        return nil, fmt.Errorf("failed to get supplier credential: %w", err)
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+    
+    q := req.URL.Query()
+    if selector != nil {
+        q.Add("strategy", selector.Strategy)
+        q.Add("only_active", fmt.Sprintf("%t", selector.Filters.OnlyActive))
+        if len(selector.Filters.Providers) > 0 {
+            q.Add("providers", strings.Join(selector.Filters.Providers, ","))
+        }
+    }
+    req.URL.RawQuery = q.Encode()
+    
+    resp, err := c.client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get available credentials: %w", err)
     }
     defer resp.Body.Close()
     
-    var credential SupplierCredential
-    if err := json.NewDecoder(resp.Body).Decode(&credential); err != nil {
-        return nil, fmt.Errorf("failed to decode credential: %w", err)
+    var result struct {
+        Success bool                  `json:"success"`
+        Data    []*SupplierCredential `json:"data"`
     }
     
-    return &credential, nil
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, fmt.Errorf("failed to decode credentials: %w", err)
+    }
+    
+    return result.Data, nil
+}
+
+// 获取特定供应商的最佳凭证
+func (c *TenantServiceClient) GetBestCredential(tenantID, provider string) (*SupplierCredential, error) {
+    selector := &CredentialSelector{
+        Strategy: "first_available",
+        Filters: struct {
+            OnlyActive bool     `json:"only_active"`
+            Providers  []string `json:"providers"`
+        }{
+            OnlyActive: true,
+            Providers:  []string{provider},
+        },
+    }
+    
+    credentials, err := c.GetAvailableCredentials(tenantID, selector)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get credentials: %w", err)
+    }
+    
+    if len(credentials) == 0 {
+        return nil, fmt.Errorf("no available credentials for provider %s", provider)
+    }
+    
+    return credentials[0], nil
+}
+
+// 测试凭证连接性
+func (c *TenantServiceClient) TestCredential(credentialID, tenantID string) (bool, error) {
+    url := fmt.Sprintf("%s/internal/suppliers/%s/test", c.baseURL, credentialID)
+    
+    reqBody := map[string]interface{}{
+        "tenant_id": tenantID,
+        "test_type": "connection",
+    }
+    
+    bodyBytes, err := json.Marshal(reqBody)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal request: %w", err)
+    }
+    
+    resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(bodyBytes))
+    if err != nil {
+        return false, fmt.Errorf("failed to test credential: %w", err)
+    }
+    defer resp.Body.Close()
+    
+    var result struct {
+        Success bool `json:"success"`
+        Data    struct {
+            Success bool `json:"success"`
+        } `json:"data"`
+    }
+    
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return false, fmt.Errorf("failed to decode test result: %w", err)
+    }
+    
+    return result.Success && result.Data.Success, nil
 }
 
 // 获取工具配置
 func (c *TenantServiceClient) GetToolConfig(tenantID, workflow, tool string) (*ToolConfig, error) {
     url := fmt.Sprintf("%s/internal/tool-configs/%s/%s/%s", c.baseURL, tenantID, workflow, tool)
-    // 实现HTTP调用逻辑
+    
+    resp, err := c.client.Get(url)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get tool config: %w", err)
+    }
+    defer resp.Body.Close()
+    
+    var config ToolConfig
+    if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+        return nil, fmt.Errorf("failed to decode tool config: %w", err)
+    }
+    
+    return &config, nil
 }
 ```
 
@@ -419,38 +563,171 @@ CREATE TABLE workflow_executions (
 );
 ```
 
-### 供应商模型配置缓存
+### 智能供应商凭证管理器
 ```go
+type CredentialManager struct {
+    tenantClient   *TenantServiceClient
+    cache          map[string]*SupplierCredential
+    lastUsed       map[string]time.Time
+    usage          map[string]int64
+    healthStatus   map[string]bool
+    mutex          sync.RWMutex
+    ttl            time.Duration
+}
+
 type ModelConfig struct {
-    TenantID     string                 `json:"tenant_id"`
-    Provider     string                 `json:"provider"`
-    ModelName    string                 `json:"model_name"`
-    APIKey       string                 `json:"api_key"`
-    BaseURL      string                 `json:"base_url"`
-    ModelParams  map[string]interface{} `json:"model_params"`
-    CachedAt     time.Time              `json:"cached_at"`
+    TenantID       string                 `json:"tenant_id"`
+    Provider       string                 `json:"provider"`
+    ModelName      string                 `json:"model_name"`
+    Credential     *SupplierCredential    `json:"credential"`
+    ModelParams    map[string]interface{} `json:"model_params"`
+    CachedAt       time.Time              `json:"cached_at"`
+    LastHealthCheck time.Time             `json:"last_health_check"`
 }
 
-// 模型配置缓存管理
-type ModelConfigCache struct {
-    cache map[string]*ModelConfig
-    mutex sync.RWMutex
-    ttl   time.Duration
-}
-
-func (c *ModelConfigCache) GetModelConfig(tenantID, provider, model string) (*ModelConfig, error) {
-    c.mutex.RLock()
-    defer c.mutex.RUnlock()
+// 智能凭证选择器
+func (cm *CredentialManager) GetBestCredentialForModel(tenantID, provider, modelName string) (*SupplierCredential, error) {
+    cm.mutex.RLock()
+    defer cm.mutex.RUnlock()
     
-    key := fmt.Sprintf("%s:%s:%s", tenantID, provider, model)
-    config, exists := c.cache[key]
-    
-    if !exists || time.Since(config.CachedAt) > c.ttl {
-        // 从Tenant Service获取最新配置
-        return c.refreshModelConfig(tenantID, provider, model)
+    // 1. 从缓存中获取可用凭证
+    cacheKey := fmt.Sprintf("%s:%s", tenantID, provider)
+    if cached, exists := cm.cache[cacheKey]; exists {
+        if time.Since(cached.UpdatedAt) < cm.ttl && cm.healthStatus[cached.ID] {
+            return cached, nil
+        }
     }
     
-    return config, nil
+    // 2. 从Tenant Service获取所有可用凭证
+    credentials, err := cm.tenantClient.GetAvailableCredentials(tenantID, &CredentialSelector{
+        Strategy: "least_used",
+        Filters: struct {
+            OnlyActive bool     `json:"only_active"`
+            Providers  []string `json:"providers"`
+        }{
+            OnlyActive: true,
+            Providers:  []string{provider},
+        },
+    })
+    
+    if err != nil {
+        return nil, fmt.Errorf("failed to get credentials: %w", err)
+    }
+    
+    if len(credentials) == 0 {
+        return nil, fmt.Errorf("no available credentials for provider %s", provider)
+    }
+    
+    // 3. 应用智能选择策略
+    best := cm.selectBestCredential(credentials, modelName)
+    
+    // 4. 更新缓存
+    cm.cache[cacheKey] = best
+    
+    return best, nil
+}
+
+// 智能凭证选择策略
+func (cm *CredentialManager) selectBestCredential(credentials []*SupplierCredential, modelName string) *SupplierCredential {
+    var best *SupplierCredential
+    var bestScore float64
+    
+    for _, cred := range credentials {
+        score := cm.calculateCredentialScore(cred, modelName)
+        if best == nil || score > bestScore {
+            best = cred
+            bestScore = score
+        }
+    }
+    
+    return best
+}
+
+// 凭证评分算法
+func (cm *CredentialManager) calculateCredentialScore(cred *SupplierCredential, modelName string) float64 {
+    score := 100.0
+    
+    // 1. 健康状态权重 (40%)
+    if !cm.healthStatus[cred.ID] {
+        score -= 40
+    }
+    
+    // 2. 使用频率权重 (30%) - 负载均衡
+    usageCount := cm.usage[cred.ID]
+    if usageCount > 0 {
+        score -= float64(usageCount) * 0.1
+    }
+    
+    // 3. 最后使用时间权重 (20%) - 避免冷启动
+    if lastUsed, exists := cm.lastUsed[cred.ID]; exists {
+        timeSinceUsed := time.Since(lastUsed).Minutes()
+        if timeSinceUsed > 60 { // 超过1小时未使用，减分
+            score -= timeSinceUsed * 0.1
+        }
+    }
+    
+    // 4. 模型配置匹配度权重 (10%)
+    if modelConfigs, ok := cred.ModelConfigs[modelName]; ok {
+        if modelConfigs != nil {
+            score += 10
+        }
+    }
+    
+    return score
+}
+
+// 凭证健康检查
+func (cm *CredentialManager) healthCheck(ctx context.Context) {
+    cm.mutex.RLock()
+    credentials := make([]*SupplierCredential, 0, len(cm.cache))
+    for _, cred := range cm.cache {
+        credentials = append(credentials, cred)
+    }
+    cm.mutex.RUnlock()
+    
+    for _, cred := range credentials {
+        go func(c *SupplierCredential) {
+            healthy, err := cm.tenantClient.TestCredential(c.ID, c.TenantID)
+            if err != nil {
+                log.Printf("健康检查失败: %s - %v", c.ID, err)
+                healthy = false
+            }
+            
+            cm.mutex.Lock()
+            cm.healthStatus[c.ID] = healthy
+            cm.mutex.Unlock()
+            
+            if healthy {
+                log.Printf("凭证 %s (%s) 健康检查通过", c.DisplayName, c.Provider)
+            } else {
+                log.Printf("凭证 %s (%s) 健康检查失败", c.DisplayName, c.Provider)
+            }
+        }(cred)
+    }
+}
+
+// 记录凭证使用情况
+func (cm *CredentialManager) RecordUsage(credentialID string) {
+    cm.mutex.Lock()
+    defer cm.mutex.Unlock()
+    
+    cm.usage[credentialID]++
+    cm.lastUsed[credentialID] = time.Now()
+}
+
+// 启动后台健康检查
+func (cm *CredentialManager) StartHealthCheck(ctx context.Context, interval time.Duration) {
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+    
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            cm.healthCheck(ctx)
+        }
+    }
 }
 ```
 
@@ -546,6 +823,163 @@ func sanitizeLogData(data map[string]interface{}) map[string]interface{} {
         }
     }
     return sanitized
+}
+```
+
+## 🚀 服务启动和凭证同步
+
+### 启动时凭证预热机制
+
+```go
+// 服务启动时的凭证预热
+func (cm *CredentialManager) WarmUpCredentials(ctx context.Context) error {
+    log.Printf("开始凭证预热...")
+    
+    // 1. 获取所有租户列表（从配置或数据库）
+    tenants, err := cm.loadActiveTenants()
+    if err != nil {
+        return fmt.Errorf("加载租户列表失败: %w", err)
+    }
+    
+    // 2. 为每个租户预热凭证
+    for _, tenantID := range tenants {
+        go func(tid string) {
+            if err := cm.warmUpTenantCredentials(ctx, tid); err != nil {
+                log.Printf("租户 %s 凭证预热失败: %v", tid, err)
+            }
+        }(tenantID)
+    }
+    
+    log.Printf("凭证预热完成，共处理 %d 个租户", len(tenants))
+    return nil
+}
+
+// 单个租户凭证预热
+func (cm *CredentialManager) warmUpTenantCredentials(ctx context.Context, tenantID string) error {
+    // 获取所有支持的供应商
+    providers := []string{"openai", "anthropic", "deepseek", "google", "azure"}
+    
+    for _, provider := range providers {
+        credentials, err := cm.tenantClient.GetAvailableCredentials(tenantID, &CredentialSelector{
+            Strategy: "first_available",
+            Filters: struct {
+                OnlyActive bool     `json:"only_active"`
+                Providers  []string `json:"providers"`
+            }{
+                OnlyActive: true,
+                Providers:  []string{provider},
+            },
+        })
+        
+        if err != nil {
+            log.Printf("获取租户 %s 的 %s 凭证失败: %v", tenantID, provider, err)
+            continue
+        }
+        
+        // 预热缓存并进行健康检查
+        for _, cred := range credentials {
+            cacheKey := fmt.Sprintf("%s:%s", tenantID, provider)
+            
+            cm.mutex.Lock()
+            cm.cache[cacheKey] = cred
+            cm.usage[cred.ID] = 0
+            cm.lastUsed[cred.ID] = time.Now()
+            cm.mutex.Unlock()
+            
+            // 异步健康检查
+            go func(c *SupplierCredential) {
+                healthy, err := cm.tenantClient.TestCredential(c.ID, c.TenantID)
+                if err != nil {
+                    log.Printf("凭证 %s 健康检查失败: %v", c.ID, err)
+                    healthy = false
+                }
+                
+                cm.mutex.Lock()
+                cm.healthStatus[c.ID] = healthy
+                cm.mutex.Unlock()
+                
+                if healthy {
+                    log.Printf("凭证预热成功: %s (%s) - %s", c.DisplayName, c.Provider, c.ID)
+                } else {
+                    log.Printf("凭证预热失败: %s (%s) - %s", c.DisplayName, c.Provider, c.ID)
+                }
+            }(cred)
+        }
+    }
+    
+    return nil
+}
+
+// 加载活跃租户列表
+func (cm *CredentialManager) loadActiveTenants() ([]string, error) {
+    // 这里可以从配置文件或数据库获取
+    // 为了简化，我们通过Tenant Service的内部接口获取
+    resp, err := cm.tenantClient.client.Get(cm.tenantClient.baseURL + "/internal/tenants/active")
+    if err != nil {
+        return nil, fmt.Errorf("获取活跃租户失败: %w", err)
+    }
+    defer resp.Body.Close()
+    
+    var result struct {
+        Success bool     `json:"success"`
+        Data    []string `json:"data"`
+    }
+    
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, fmt.Errorf("解析租户列表失败: %w", err)
+    }
+    
+    return result.Data, nil
+}
+```
+
+### 服务启动流程
+
+```go
+func main() {
+    // 1. 初始化配置
+    config := loadConfig()
+    
+    // 2. 初始化服务客户端
+    tenantClient := &TenantServiceClient{
+        baseURL: config.TenantServiceURL,
+        client:  &http.Client{Timeout: 30 * time.Second},
+    }
+    
+    // 3. 初始化凭证管理器
+    credentialManager := &CredentialManager{
+        tenantClient: tenantClient,
+        cache:        make(map[string]*SupplierCredential),
+        lastUsed:     make(map[string]time.Time),
+        usage:        make(map[string]int64),
+        healthStatus: make(map[string]bool),
+        ttl:          5 * time.Minute,
+    }
+    
+    // 4. 启动凭证预热
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    
+    if err := credentialManager.WarmUpCredentials(ctx); err != nil {
+        log.Fatalf("凭证预热失败: %v", err)
+    }
+    
+    // 5. 启动健康检查
+    go credentialManager.StartHealthCheck(context.Background(), 2*time.Minute)
+    
+    // 6. 初始化EINO工作流
+    workflowManager := initializeWorkflows(credentialManager)
+    
+    // 7. 启动HTTP服务
+    server := &http.Server{
+        Addr:    ":8003",
+        Handler: setupRoutes(workflowManager),
+    }
+    
+    log.Printf("EINO Service 启动成功，端口: 8003")
+    if err := server.ListenAndServe(); err != nil {
+        log.Fatalf("服务启动失败: %v", err)
+    }
 }
 ```
 
