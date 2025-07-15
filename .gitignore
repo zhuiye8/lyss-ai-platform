@@ -254,3 +254,4 @@ docs/.doctrees/
 .python-version
 .node-version
 .go-version
+.claude-trace
