@@ -162,55 +162,219 @@ class SupplierCredentialSecureResponse(BaseSchema):
     updated_at: datetime = Field(..., description="更新时间")
 
 
-# 供应商名称枚举（支持的供应商）
+class ModelInfo(BaseSchema):
+    """模型信息模型"""
+    
+    model_id: str = Field(..., description="模型ID")
+    display_name: str = Field(..., description="显示名称")
+    description: str = Field(..., description="模型描述")
+    type: str = Field(..., description="模型类型")
+    context_window: int = Field(..., description="上下文窗口大小")
+    max_tokens: int = Field(..., description="最大输出tokens")
+    price_per_1k_tokens: Dict[str, float] = Field(..., description="每千tokens价格")
+    features: List[str] = Field(..., description="特性列表")
+    is_available: bool = Field(True, description="是否可用")
+
+
+class ProviderInfo(BaseSchema):
+    """供应商信息模型"""
+    
+    provider_name: str = Field(..., description="供应商名称")
+    display_name: str = Field(..., description="显示名称")
+    description: str = Field(..., description="供应商描述")
+    logo_url: str = Field(..., description="Logo URL")
+    base_url: Optional[str] = Field(None, description="基础URL")
+    models: List[ModelInfo] = Field(..., description="模型列表")
+
+
+class AvailableProvidersResponse(BaseSchema):
+    """可用供应商响应模型"""
+    
+    providers: List[ProviderInfo] = Field(..., description="供应商列表")
+
+
+class ProviderModelsResponse(BaseSchema):
+    """供应商模型响应模型"""
+    
+    provider_name: str = Field(..., description="供应商名称")
+    display_name: str = Field(..., description="显示名称")
+    models: List[ModelInfo] = Field(..., description="模型列表")
+
+
+# 供应商和模型树形结构配置
 SUPPORTED_PROVIDERS = {
     "openai": {
         "display_name": "OpenAI",
+        "description": "OpenAI是人工智能研究公司，提供GPT系列模型",
+        "logo_url": "/images/providers/openai.png",
         "base_url": "https://api.openai.com/v1",
-        "default_models": ["gpt-4", "gpt-3.5-turbo"],
         "api_key_pattern": r"^sk-[A-Za-z0-9]{48}$",
         "test_endpoint": "/models",
-        "test_method": "model_list"
+        "test_method": "model_list",
+        "models": {
+            "gpt-4": {
+                "display_name": "GPT-4",
+                "description": "最强大的GPT-4模型，适用于复杂任务",
+                "type": "chat",
+                "context_window": 8192,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.03, "output": 0.06},
+                "features": ["复杂推理", "创意写作", "多语言", "代码生成"]
+            },
+            "gpt-4-turbo": {
+                "display_name": "GPT-4 Turbo",
+                "description": "更快的GPT-4版本，性价比更高",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.01, "output": 0.03},
+                "features": ["快速响应", "长上下文", "多语言", "代码生成"]
+            },
+            "gpt-3.5-turbo": {
+                "display_name": "GPT-3.5 Turbo",
+                "description": "快速且经济的对话模型",
+                "type": "chat",
+                "context_window": 4096,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.001, "output": 0.002},
+                "features": ["高性价比", "快速响应", "多语言"]
+            }
+        }
     },
     "anthropic": {
         "display_name": "Anthropic",
+        "description": "Anthropic专注于AI安全研究，提供Claude系列模型",
+        "logo_url": "/images/providers/anthropic.png",
         "base_url": "https://api.anthropic.com",
-        "default_models": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
         "api_key_pattern": r"^sk-ant-[A-Za-z0-9\-_]{95}$",
         "test_endpoint": "/v1/messages",
-        "test_method": "simple_message"
-    },
-    "google": {
-        "display_name": "Google AI",
-        "base_url": "https://generativelanguage.googleapis.com/v1",
-        "default_models": ["gemini-pro", "gemini-pro-vision"],
-        "api_key_pattern": r"^[A-Za-z0-9\-_]{39}$",
-        "test_endpoint": "/v1/models",
-        "test_method": "model_list"
+        "test_method": "simple_message",
+        "models": {
+            "claude-3-opus-20240229": {
+                "display_name": "Claude 3 Opus",
+                "description": "Anthropic最强大的模型，适用于复杂推理",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.015, "output": 0.075},
+                "features": ["超长上下文", "复杂推理", "创意写作", "多语言"]
+            },
+            "claude-3-sonnet-20240229": {
+                "display_name": "Claude 3 Sonnet",
+                "description": "平衡性能和成本的模型",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.003, "output": 0.015},
+                "features": ["长上下文", "平衡性能", "多语言"]
+            },
+            "claude-3-haiku-20240307": {
+                "display_name": "Claude 3 Haiku",
+                "description": "快速且经济的对话模型",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0008, "output": 0.004},
+                "features": ["快速响应", "高性价比", "多语言"]
+            }
+        }
     },
     "deepseek": {
         "display_name": "DeepSeek",
+        "description": "DeepSeek是一家专注于AI大模型技术的公司，提供对话和代码模型",
+        "logo_url": "/images/providers/deepseek.png",
         "base_url": "https://api.deepseek.com",
-        "default_models": ["deepseek-chat", "deepseek-reasoner"],
         "api_key_pattern": r"^sk-[A-Za-z0-9]{32}$",
-        "test_endpoint": "/models",
-        "test_method": "model_list"
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list",
+        "models": {
+            "deepseek-chat": {
+                "display_name": "DeepSeek Chat",
+                "description": "DeepSeek通用对话模型，适用于日常对话和问答",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0014, "output": 0.0028},
+                "features": ["对话", "推理", "多语言", "问答"]
+            },
+            "deepseek-coder": {
+                "display_name": "DeepSeek Coder",
+                "description": "专门用于代码生成、调试和编程任务的模型",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0014, "output": 0.0028},
+                "features": ["代码生成", "代码解释", "编程问答", "调试"]
+            }
+        }
+    },
+    "google": {
+        "display_name": "Google AI",
+        "description": "Google AI提供Gemini系列多模态模型",
+        "logo_url": "/images/providers/google.png",
+        "base_url": "https://generativelanguage.googleapis.com",
+        "api_key_pattern": r"^[A-Za-z0-9\-_]{39}$",
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list",
+        "models": {
+            "gemini-pro": {
+                "display_name": "Gemini Pro",
+                "description": "Google的先进多模态模型",
+                "type": "chat",
+                "context_window": 30720,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.0005, "output": 0.0015},
+                "features": ["多模态", "推理", "多语言"]
+            },
+            "gemini-pro-vision": {
+                "display_name": "Gemini Pro Vision",
+                "description": "支持图像理解的多模态模型",
+                "type": "multimodal",
+                "context_window": 30720,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.0005, "output": 0.0015},
+                "features": ["图像理解", "多模态", "推理"]
+            }
+        }
     },
     "azure": {
         "display_name": "Azure OpenAI",
+        "description": "Azure托管的OpenAI模型服务",
+        "logo_url": "/images/providers/azure.png",
         "base_url": None,  # 需要自定义
-        "default_models": ["gpt-4", "gpt-35-turbo"],
         "api_key_pattern": r"^[A-Za-z0-9]{32}$",
         "test_endpoint": "/openai/deployments",
-        "test_method": "deployment_list"
+        "test_method": "deployment_list",
+        "models": {
+            "gpt-4": {
+                "display_name": "GPT-4 (Azure)",
+                "description": "Azure托管的GPT-4模型",
+                "type": "chat",
+                "context_window": 8192,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.03, "output": 0.06},
+                "features": ["企业级", "数据隐私", "复杂推理"]
+            },
+            "gpt-35-turbo": {
+                "display_name": "GPT-3.5 Turbo (Azure)",
+                "description": "Azure托管的GPT-3.5模型",
+                "type": "chat",
+                "context_window": 4096,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.001, "output": 0.002},
+                "features": ["企业级", "数据隐私", "高性价比"]
+            }
+        }
     },
     "custom": {
         "display_name": "自定义供应商",
+        "description": "用户自定义的AI模型供应商",
+        "logo_url": "/images/providers/custom.png",
         "base_url": None,  # 需要自定义
-        "default_models": [],
         "api_key_pattern": None,  # 不验证格式
         "test_endpoint": "/v1/models",
-        "test_method": "model_list"
+        "test_method": "model_list",
+        "models": {}  # 动态获取
     }
 }
 

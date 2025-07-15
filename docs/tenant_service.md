@@ -97,7 +97,32 @@ SUPPORTED_PROVIDERS = {
     "openai": {
         "display_name": "OpenAI",
         "base_url": "https://api.openai.com/v1", 
-        "default_models": ["gpt-4", "gpt-3.5-turbo"],
+        "models": {
+            "gpt-4": {
+                "display_name": "GPT-4",
+                "description": "最强大的GPT-4模型，适用于复杂任务",
+                "type": "chat",
+                "context_window": 8192,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.03, "output": 0.06}
+            },
+            "gpt-4-turbo": {
+                "display_name": "GPT-4 Turbo",
+                "description": "更快的GPT-4版本，性价比更高",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.01, "output": 0.03}
+            },
+            "gpt-3.5-turbo": {
+                "display_name": "GPT-3.5 Turbo",
+                "description": "快速且经济的对话模型",
+                "type": "chat",
+                "context_window": 4096,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.001, "output": 0.002}
+            }
+        },
         "api_key_pattern": r"^sk-[A-Za-z0-9]{48}$",
         "test_endpoint": "/models",
         "test_method": "model_list"
@@ -105,31 +130,107 @@ SUPPORTED_PROVIDERS = {
     "anthropic": {
         "display_name": "Anthropic",
         "base_url": "https://api.anthropic.com",
-        "default_models": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+        "models": {
+            "claude-3-opus-20240229": {
+                "display_name": "Claude 3 Opus",
+                "description": "Anthropic最强大的模型，适用于复杂推理",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.015, "output": 0.075}
+            },
+            "claude-3-sonnet-20240229": {
+                "display_name": "Claude 3 Sonnet",
+                "description": "平衡性能和成本的模型",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.003, "output": 0.015}
+            },
+            "claude-3-haiku-20240307": {
+                "display_name": "Claude 3 Haiku",
+                "description": "快速且经济的对话模型",
+                "type": "chat",
+                "context_window": 200000,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0008, "output": 0.004}
+            }
+        },
         "api_key_pattern": r"^sk-ant-[A-Za-z0-9\-_]{95}$",
         "test_endpoint": "/v1/messages",
         "test_method": "simple_message"
     },
-    "google": {
-        "display_name": "Google AI",
-        "base_url": "https://generativelanguage.googleapis.com",
-        "default_models": ["gemini-pro", "gemini-pro-vision"],
-        "api_key_pattern": r"^[A-Za-z0-9\-_]{39}$",
-        "test_endpoint": "/v1/models",
-        "test_method": "model_list"
-    },
     "deepseek": {
         "display_name": "DeepSeek",
         "base_url": "https://api.deepseek.com",
-        "default_models": ["deepseek-chat", "deepseek-coder"],
+        "models": {
+            "deepseek-chat": {
+                "display_name": "DeepSeek Chat",
+                "description": "DeepSeek通用对话模型",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0014, "output": 0.0028}
+            },
+            "deepseek-coder": {
+                "display_name": "DeepSeek Coder",
+                "description": "专门用于代码生成和编程任务",
+                "type": "chat",
+                "context_window": 32768,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.0014, "output": 0.0028}
+            }
+        },
         "api_key_pattern": r"^sk-[A-Za-z0-9]{48}$",
+        "test_endpoint": "/v1/models",
+        "test_method": "model_list"
+    },
+    "google": {
+        "display_name": "Google AI",
+        "base_url": "https://generativelanguage.googleapis.com",
+        "models": {
+            "gemini-pro": {
+                "display_name": "Gemini Pro",
+                "description": "Google的先进多模态模型",
+                "type": "chat",
+                "context_window": 30720,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.0005, "output": 0.0015}
+            },
+            "gemini-pro-vision": {
+                "display_name": "Gemini Pro Vision",
+                "description": "支持图像理解的多模态模型",
+                "type": "multimodal",
+                "context_window": 30720,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.0005, "output": 0.0015}
+            }
+        },
+        "api_key_pattern": r"^[A-Za-z0-9\-_]{39}$",
         "test_endpoint": "/v1/models",
         "test_method": "model_list"
     },
     "azure": {
         "display_name": "Azure OpenAI",
         "base_url": None,  # 需要自定义
-        "default_models": ["gpt-4", "gpt-35-turbo"],
+        "models": {
+            "gpt-4": {
+                "display_name": "GPT-4 (Azure)",
+                "description": "Azure托管的GPT-4模型",
+                "type": "chat",
+                "context_window": 8192,
+                "max_tokens": 4096,
+                "price_per_1k_tokens": {"input": 0.03, "output": 0.06}
+            },
+            "gpt-35-turbo": {
+                "display_name": "GPT-3.5 Turbo (Azure)",
+                "description": "Azure托管的GPT-3.5模型",
+                "type": "chat",
+                "context_window": 4096,
+                "max_tokens": 2048,
+                "price_per_1k_tokens": {"input": 0.001, "output": 0.002}
+            }
+        },
         "api_key_pattern": r"^[A-Za-z0-9]{32}$",
         "test_endpoint": "/openai/deployments",
         "test_method": "deployment_list"
@@ -137,7 +238,7 @@ SUPPORTED_PROVIDERS = {
     "custom": {
         "display_name": "自定义供应商",
         "base_url": None,  # 需要自定义
-        "default_models": [],
+        "models": {},  # 动态获取
         "api_key_pattern": None,  # 不验证格式
         "test_endpoint": "/v1/models",
         "test_method": "model_list"
@@ -763,9 +864,177 @@ GET /api/v1/admin/suppliers
 Authorization: Bearer <tenant_admin_token>
 ```
 
+**响应:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "provider_name": "deepseek",
+      "display_name": "DeepSeek开发测试",
+      "is_active": true,
+      "created_at": "2025-07-15T10:30:00Z",
+      "model_configs": {
+        "default_model": "deepseek-chat",
+        "supported_models": ["deepseek-chat", "deepseek-coder"]
+      }
+    }
+  ]
+}
+```
+
+#### 获取支持的供应商和模型树形结构
+```http
+GET /api/v1/admin/suppliers/available
+Authorization: Bearer <tenant_admin_token>
+```
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "providers": [
+      {
+        "provider_name": "deepseek",
+        "display_name": "DeepSeek",
+        "logo_url": "/images/providers/deepseek.png",
+        "description": "DeepSeek是一家专注于AI大模型技术的公司",
+        "base_url": "https://api.deepseek.com",
+        "models": [
+          {
+            "model_id": "deepseek-chat",
+            "display_name": "DeepSeek Chat",
+            "description": "DeepSeek通用对话模型",
+            "type": "chat",
+            "context_window": 32768,
+            "max_tokens": 4096,
+            "price_per_1k_tokens": {
+              "input": 0.0014,
+              "output": 0.0028
+            },
+            "features": ["对话", "推理", "多语言"]
+          },
+          {
+            "model_id": "deepseek-coder",
+            "display_name": "DeepSeek Coder",
+            "description": "专门用于代码生成和编程任务",
+            "type": "chat",
+            "context_window": 32768,
+            "max_tokens": 4096,
+            "price_per_1k_tokens": {
+              "input": 0.0014,
+              "output": 0.0028
+            },
+            "features": ["代码生成", "代码解释", "编程问答"]
+          }
+        ]
+      },
+      {
+        "provider_name": "openai",
+        "display_name": "OpenAI",
+        "logo_url": "/images/providers/openai.png",
+        "description": "OpenAI是人工智能研究公司",
+        "base_url": "https://api.openai.com/v1",
+        "models": [
+          {
+            "model_id": "gpt-4",
+            "display_name": "GPT-4",
+            "description": "最强大的GPT-4模型，适用于复杂任务",
+            "type": "chat",
+            "context_window": 8192,
+            "max_tokens": 4096,
+            "price_per_1k_tokens": {
+              "input": 0.03,
+              "output": 0.06
+            },
+            "features": ["复杂推理", "创意写作", "多语言"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### 获取特定供应商的模型列表
+```http
+GET /api/v1/admin/suppliers/providers/{provider_name}/models
+Authorization: Bearer <tenant_admin_token>
+```
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "provider_name": "deepseek",
+    "display_name": "DeepSeek",
+    "models": [
+      {
+        "model_id": "deepseek-chat",
+        "display_name": "DeepSeek Chat",
+        "description": "DeepSeek通用对话模型",
+        "type": "chat",
+        "context_window": 32768,
+        "max_tokens": 4096,
+        "price_per_1k_tokens": {
+          "input": 0.0014,
+          "output": 0.0028
+        },
+        "features": ["对话", "推理", "多语言"],
+        "is_available": true
+      },
+      {
+        "model_id": "deepseek-coder",
+        "display_name": "DeepSeek Coder",
+        "description": "专门用于代码生成和编程任务",
+        "type": "chat",
+        "context_window": 32768,
+        "max_tokens": 4096,
+        "price_per_1k_tokens": {
+          "input": 0.0014,
+          "output": 0.0028
+        },
+        "features": ["代码生成", "代码解释", "编程问答"],
+        "is_available": true
+      }
+    ]
+  }
+}
+```
+
 #### 测试已保存的供应商连接
 ```http
 POST /api/v1/admin/suppliers/{supplier_id}/test
+Authorization: Bearer <tenant_admin_token>
+```
+
+#### 更新供应商凭证
+```http
+PUT /api/v1/admin/suppliers/{supplier_id}
+Authorization: Bearer <tenant_admin_token>
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+  "display_name": "DeepSeek生产环境",
+  "api_key": "sk-new-key-here",
+  "base_url": "https://api.deepseek.com",
+  "is_active": true,
+  "model_configs": {
+    "default_model": "deepseek-chat",
+    "supported_models": ["deepseek-chat", "deepseek-coder"]
+  }
+}
+```
+
+#### 删除供应商凭证
+```http
+DELETE /api/v1/admin/suppliers/{supplier_id}
 Authorization: Bearer <tenant_admin_token>
 ```
 

@@ -2,11 +2,11 @@
 
 ## 📅 当前开发状态 (2025-07-15)
 
-**当前状态**: 🎉 供应商凭证管理系统完成，开始EINO服务开发！  
-**项目阶段**: 第三阶段 - AI功能开发期  
-**完成度**: 基础设施和文档 100%，Auth Service 100%，Tenant Service 100%，Backend API Gateway 100%，Frontend 管理界面100%
+**当前状态**: 🎉 Tenant Service供应商-模型树形结构API完成！准备前端集成！  
+**项目阶段**: 第三阶段 - 前端供应商配置界面开发期  
+**完成度**: 基础设施和文档 100%，Auth Service 100%，Tenant Service 100%，Backend API Gateway 100%，Frontend 管理界面95%
 
-**🎉 重要更新**: 2025-07-15供应商凭证管理系统全面完成！
+**🎉 重要更新**: 2025-07-15 Tenant Service 供应商-模型树形结构API全面完成！
 - ✅ 完整登录认证链路正常：Frontend → API Gateway → Auth Service → Tenant Service
 - ✅ JWT认证和权限控制机制完全正常
 - ✅ 所有管理接口的读取和写入操作正常（租户、用户、供应商凭证）
@@ -16,7 +16,11 @@
 - ✅ DeepSeek API集成成功，连接测试通过（153ms响应时间）
 - ✅ 支持OpenAI、Anthropic、DeepSeek、Google AI、Azure OpenAI等多种供应商
 - ✅ pgcrypto加密存储和解密机制完善
-- 🎯 准备开始EINO服务开发，需要设计凭证管理对接方案
+- ✅ **新增**: 供应商-模型树形结构API完成 (`/api/v1/admin/suppliers/available`)
+- ✅ **新增**: 单个供应商模型列表API完成 (`/api/v1/admin/suppliers/providers/{provider_name}/models`)
+- ✅ **新增**: 保存前凭证测试API完成 (`/api/v1/admin/suppliers/test`)
+- ✅ **新增**: 完整的供应商和模型元数据配置，包含价格、特性、上下文窗口等详细信息
+- 🎯 **下一步**: 前端供应商配置界面和模型选择组件开发
 
 ---
 
@@ -39,7 +43,7 @@
   - ✅ 通过6/6项综合稳定性测试
 
 #### 2. **Tenant Service (租户服务)** 👥  
-- **状态**: ✅ 100%完成 - 内部接口 + 管理API全部实现
+- **状态**: ✅ 100%完成 - 内部接口 + 管理API + 供应商-模型树形结构API全部实现
 - **重要性**: 🔴 最高优先级 - 已完成！
 - **原因**: 管理用户数据和供应商凭证，Auth Service 需要调用此服务
 - **技术栈**: Python + FastAPI + PostgreSQL + pgcrypto
@@ -50,9 +54,13 @@
   - ✅ 租户管理API (`/api/v1/admin/tenants/*`)
   - ✅ 用户管理API (`/api/v1/admin/users/*`)
   - ✅ 供应商凭证API (`/api/v1/admin/suppliers/*`)
+  - ✅ **新增**: 供应商-模型树形结构API (`/api/v1/admin/suppliers/available`)
+  - ✅ **新增**: 单个供应商模型API (`/api/v1/admin/suppliers/providers/{provider_name}/models`)
+  - ✅ **新增**: 保存前凭证测试API (`/api/v1/admin/suppliers/test`)
   - ✅ 完整的CRUD操作和数据隔离
   - ✅ 供应商凭证加密存储和连接测试
   - ✅ 支持OpenAI、Anthropic、DeepSeek、Google AI、Azure OpenAI等多种供应商
+  - ✅ 完整的供应商和模型元数据配置，包含价格、特性、上下文窗口等详细信息
 
 ### 第二优先级 (核心功能)
 
@@ -107,15 +115,17 @@
 
 ## 📋 当前开发任务
 
-### 🎯 下一个开发目标: EINO Service + 凭证管理对接
+### 🎯 下一个开发目标: 前端供应商配置界面 + 模型选择组件
 
 #### 🚨 当前优先任务（按顺序执行）
 1. **✅ Auth Service + 前后端登录** - 已完成！认证链路完全打通
 2. **✅ Tenant Service 租户管理API** - 已完成！所有管理API实现  
 3. **✅ Tenant Service 用户管理API** - 已完成！完整的CRUD操作  
 4. **✅ Tenant Service 供应商凭证API** - 已完成！支持多种供应商和连接测试
-5. **🔄 EINO Service 凭证对接设计** - 设计EINO与凭证管理系统的对接方案
-6. **⏳ EINO Service 基础架构** - 实现Go服务和EINO框架集成
+5. **✅ Tenant Service 供应商-模型树形结构API** - 已完成！完整的供应商和模型元数据
+6. **🔄 前端供应商配置界面** - 基于新API实现供应商配置界面
+7. **⏳ 前端模型选择组件** - 实现树形结构的模型选择组件
+8. **⏳ 简化版EINO聊天功能** - 实现基础的多租户聊天功能
 
 #### Tenant Service 已完成功能 ✅
 - ✅ **内部用户验证接口** (`/internal/users/verify`) - Auth Service 调用
@@ -423,3 +433,107 @@ frontend/src/
 5. **只需补全对外管理API**: tenants.py, users.py, suppliers.py 路由文件
 
 **📝 文档更新**: 每完成一个微服务后，请及时更新本文档的开发进度
+
+---
+
+## 🎯 明天的Claude开发者 - 快速介入指南 (2025-07-15)
+
+### 📋 项目当前状态摘要
+
+**Lyss AI Platform** 是一个**企业级AI服务聚合与管理平台**，采用微服务架构，实现多租户的AI模型集成、编排和治理。
+
+#### ✅ 已完成的核心组件 (100%)
+1. **Auth Service** (端口8001) - JWT认证、Redis集成、用户登录
+2. **Tenant Service** (端口8002) - 租户/用户/供应商管理API + **供应商-模型树形结构API**
+3. **Backend API Gateway** (端口8000) - 统一入口、路由转发、认证中间件
+4. **Frontend** (端口3000) - 登录界面、管理界面、基础组件
+
+#### 🔄 当前开发重点 (优先级排序)
+1. **前端供应商配置界面** - 基于新的树形结构API实现供应商配置界面
+2. **前端模型选择组件** - 实现树形结构的模型选择组件
+3. **简化版EINO聊天功能** - 实现基础的多租户聊天功能
+
+### 🎯 核心需求理解
+
+**用户故事**: 多租户可以**登录平台**，**配置DeepSeek供应商**，**选择使用它提供的模型**进行**对话**！
+
+**数据结构**: 供应商 → 模型 (树形层级数据)
+```
+DeepSeek (供应商)
+├── deepseek-chat (基础聊天模型)
+└── deepseek-coder (代码模型)
+```
+
+### 🚀 今天已完成的关键工作 (2025-07-15)
+
+#### ✅ Tenant Service 供应商-模型树形结构API实现
+1. **更新了文档** - `docs/tenant_service.md` 完善了供应商-模型树形结构设计
+2. **实现了数据模型** - `models/schemas/supplier.py` 添加了完整的供应商和模型元数据配置
+3. **实现了API路由** - `routers/suppliers.py` 添加了3个新的API端点：
+   - `GET /api/v1/admin/suppliers/available` - 获取所有供应商和模型树形结构
+   - `GET /api/v1/admin/suppliers/providers/{provider_name}/models` - 获取特定供应商的模型
+   - `POST /api/v1/admin/suppliers/test` - 保存前测试供应商凭证
+4. **实现了服务层** - `services/supplier_service.py` 添加了对应的业务逻辑
+
+#### 🔧 技术实现亮点
+- **完整的元数据配置**: 包含价格、特性、上下文窗口、最大tokens等详细信息
+- **树形结构设计**: 支持供应商 → 模型的层级关系
+- **DeepSeek完整支持**: 包含deepseek-chat和deepseek-coder两个模型
+- **多供应商支持**: OpenAI、Anthropic、DeepSeek、Google AI、Azure OpenAI等
+
+### 📝 明天需要继续的工作
+
+#### 🎯 优先级1: 前端供应商配置界面
+**文件位置**: `frontend/src/pages/admin/suppliers/`
+**技术要求**: 
+- 基于新的`/api/v1/admin/suppliers/available`API实现
+- 显示供应商和模型的树形结构
+- 支持DeepSeek供应商配置
+- 使用真实的API密钥: `sk-cc6f618f9c2d44f4ab33d238182724b3` (在`key.txt`中)
+
+#### 🎯 优先级2: 前端模型选择组件
+**文件位置**: `frontend/src/components/` (新建ModelSelector组件)
+**技术要求**:
+- 树形结构的模型选择界面
+- 显示模型的详细信息(价格、特性、上下文窗口等)
+- 支持模型筛选和搜索
+
+#### 🎯 优先级3: 简化EINO聊天功能
+**文件位置**: `eino-service/` (已有基础架构)
+**技术要求**:
+- 简化当前的复杂工作流引擎
+- 实现基础的多租户聊天功能
+- 与Tenant Service凭证管理系统对接
+
+### 🔍 关键文件和代码位置
+
+#### 📁 核心代码文件
+- `tenant-service/tenant_service/models/schemas/supplier.py` - 供应商和模型数据结构
+- `tenant-service/tenant_service/routers/suppliers.py` - 供应商API路由
+- `tenant-service/tenant_service/services/supplier_service.py` - 供应商业务逻辑
+- `key.txt` - DeepSeek API密钥
+- `docs/tenant_service.md` - 完整的API文档
+
+#### 🔗 重要API端点
+- `GET /api/v1/admin/suppliers/available` - 获取供应商-模型树形结构
+- `GET /api/v1/admin/suppliers/providers/deepseek/models` - 获取DeepSeek模型列表
+- `POST /api/v1/admin/suppliers/test` - 测试供应商凭证
+
+### 💡 开发提示
+
+1. **全程使用中文** - 注释、错误信息、提交信息都使用中文
+2. **遵循现有规范** - 参考现有的前端管理页面实现方式
+3. **优先实现基础功能** - 先实现能用的基础版本，再优化体验
+4. **注意多租户隔离** - 所有数据操作都要验证tenant_id
+
+### 📚 必读文档
+1. `CLAUDE.md` - 项目总体指导和开发规范
+2. `DEVELOPMENT_PRIORITY.md` - 当前文档，开发状态和任务
+3. `docs/tenant_service.md` - Tenant Service API规范
+4. `docs/frontend.md` - 前端技术规范
+
+### 🚨 重要提醒
+- 当前项目已经有完整的认证系统和管理界面
+- 重点是实现**供应商配置**和**模型选择**的前端界面
+- 后端API已经完成，只需要前端集成
+- 目标是让用户能够配置DeepSeek并选择模型进行对话

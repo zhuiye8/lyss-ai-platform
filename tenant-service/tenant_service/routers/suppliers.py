@@ -9,6 +9,7 @@ import uuid
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
 import structlog
 
 from ..core.database import get_db
@@ -20,7 +21,10 @@ from ..models.schemas.supplier import (
     SupplierCredentialDetailResponse,
     SupplierCredentialListParams,
     SupplierTestRequest,
-    SupplierTestResponse
+    SupplierTestResponse,
+    AvailableProvidersResponse,
+    ProviderModelsResponse,
+    SUPPORTED_PROVIDERS
 )
 from ..services.supplier_service import SupplierService
 
@@ -494,5 +498,216 @@ async def test_supplier_credential(
                 "code": "5003",
                 "message": "内部服务器错误",
                 "details": {"error": "供应商连接测试失败"}
+            }
+        )
+
+
+@router.get(
+    "/admin/suppliers/available",
+    response_model=ApiResponse[AvailableProvidersResponse],
+    summary="获取支持的供应商和模型列表",
+    description="获取系统支持的所有供应商和其对应的模型信息（树形结构）"
+)
+async def get_available_providers(
+    request: Request,
+    request_id: str = Depends(get_request_id),
+    tenant_id: str = Depends(get_current_tenant_id)
+) -> ApiResponse[AvailableProvidersResponse]:
+    """
+    获取支持的供应商和模型列表
+    
+    Args:
+        request: FastAPI请求对象
+        request_id: 请求ID
+        tenant_id: 当前租户ID
+        
+    Returns:
+        供应商和模型的树形结构数据
+    """
+    try:
+        supplier_service = SupplierService(db)
+        providers_data = await supplier_service.get_available_providers()
+        
+        return ApiResponse[AvailableProvidersResponse](
+            success=True,
+            data=providers_data,
+            message="获取支持的供应商列表成功",
+            request_id=request_id
+        )
+        
+    except Exception as e:
+        logger.error(
+            "获取支持的供应商列表过程中发生异常",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "5003",
+                "message": "内部服务器错误",
+                "details": {"error": "获取支持的供应商列表失败"}
+            }
+        )
+
+
+@router.get(
+    "/admin/suppliers/providers/{provider_name}/models",
+    response_model=ApiResponse[ProviderModelsResponse],
+    summary="获取指定供应商的模型列表",
+    description="获取指定供应商的详细模型信息"
+)
+async def get_provider_models(
+    provider_name: str,
+    request: Request,
+    request_id: str = Depends(get_request_id),
+    tenant_id: str = Depends(get_current_tenant_id)
+) -> ApiResponse[ProviderModelsResponse]:
+    """
+    获取指定供应商的模型列表
+    
+    Args:
+        provider_name: 供应商名称
+        request: FastAPI请求对象
+        request_id: 请求ID
+        tenant_id: 当前租户ID
+        
+    Returns:
+        供应商的模型信息
+    """
+    try:
+        supplier_service = SupplierService(db)
+        models_data = await supplier_service.get_provider_models(provider_name)
+        
+        if not models_data:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "code": "3005",
+                    "message": f"供应商 {provider_name} 不存在",
+                    "details": {"provider_name": provider_name}
+                }
+            )
+        
+        return ApiResponse[ProviderModelsResponse](
+            success=True,
+            data=models_data,
+            message=f"获取 {provider_name} 供应商模型列表成功",
+            request_id=request_id
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "获取供应商模型列表过程中发生异常",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            provider_name=provider_name,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "5003",
+                "message": "内部服务器错误",
+                "details": {"error": "获取供应商模型列表失败"}
+            }
+        )
+
+
+class SupplierTestBeforeSaveRequest(BaseModel):
+    """保存前测试供应商凭证请求"""
+    provider_name: str = Field(..., description="供应商名称")
+    api_key: str = Field(..., description="API密钥")
+    base_url: Optional[str] = Field(None, description="基础URL")
+    test_type: str = Field("connection", description="测试类型")
+    model_name: Optional[str] = Field(None, description="测试模型")
+    test_message: Optional[str] = Field(None, description="测试消息")
+
+
+@router.post(
+    "/admin/suppliers/test",
+    response_model=ApiResponse[SupplierTestResponse],
+    summary="测试供应商凭证（保存前测试）",
+    description="在保存供应商凭证前测试API密钥的有效性"
+)
+async def test_supplier_credential_before_save(
+    request_data: SupplierTestBeforeSaveRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    request_id: str = Depends(get_request_id),
+    tenant_id: str = Depends(get_current_tenant_id)
+) -> ApiResponse[SupplierTestResponse]:
+    """
+    测试供应商凭证（保存前测试）
+    
+    Args:
+        request_data: 测试请求数据
+        request: FastAPI请求对象
+        db: 数据库会话
+        request_id: 请求ID
+        tenant_id: 当前租户ID
+        
+    Returns:
+        测试结果
+    """
+    try:
+        supplier_service = SupplierService(db)
+        
+        # 构建测试请求对象
+        test_request = SupplierTestRequest(
+            test_type=request_data.test_type,
+            model_name=request_data.model_name,
+            test_message=request_data.test_message
+        )
+        
+        test_result = await supplier_service.test_credential_before_save(
+            request_data.provider_name,
+            request_data.api_key,
+            request_data.base_url,
+            test_request,
+            tenant_id,
+            request_id
+        )
+        
+        return ApiResponse[SupplierTestResponse](
+            success=True,
+            data=test_result,
+            message="供应商凭证测试完成",
+            request_id=request_id
+        )
+        
+    except ValueError as e:
+        logger.warning(
+            "供应商凭证测试失败：参数验证错误",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            provider_name=request_data.provider_name,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "1001",
+                "message": str(e),
+                "details": {"provider_name": request_data.provider_name}
+            }
+        )
+    except Exception as e:
+        logger.error(
+            "供应商凭证测试过程中发生异常",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            provider_name=request_data.provider_name,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "5003",
+                "message": "内部服务器错误",
+                "details": {"error": "供应商凭证测试失败"}
             }
         )

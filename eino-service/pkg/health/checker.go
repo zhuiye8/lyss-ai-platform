@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"runtime"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -30,32 +31,79 @@ func NewChecker(tenantClient *client.TenantClient, redisClient *redis.Client, cr
 	}
 }
 
-// CheckHealth 执行健康检查
-func (c *Checker) CheckHealth() *models.HealthResponse {
-	response := &models.HealthResponse{
-		Status:       "healthy",
-		Timestamp:    time.Now().Format(time.RFC3339),
-		Version:      "1.0.0",
-		Dependencies: make(map[string]string),
-		Metrics:      make(map[string]int),
+// HealthResult 健康检查结果
+type HealthResult struct {
+	Status        string            `json:"status"`
+	Dependencies  map[string]string `json:"dependencies"`
+	ResponseTimes map[string]int64  `json:"response_times"`
+	Metrics       map[string]int    `json:"metrics"`
+}
+
+// Check 执行健康检查
+func (c *Checker) Check(ctx context.Context) *HealthResult {
+	result := &HealthResult{
+		Status:        "healthy",
+		Dependencies:  make(map[string]string),
+		ResponseTimes: make(map[string]int64),
+		Metrics:       make(map[string]int),
 	}
 	
 	// 检查租户服务
-	if err := c.checkTenantService(); err != nil {
-		response.Dependencies["tenant_service"] = "unhealthy"
-		response.Status = "unhealthy"
+	start := time.Now()
+	if err := c.checkTenantService(ctx); err != nil {
+		result.Dependencies["tenant_service"] = "unhealthy"
+		result.Status = "unhealthy"
 		c.logger.WithError(err).Error("租户服务健康检查失败")
 	} else {
-		response.Dependencies["tenant_service"] = "healthy"
+		result.Dependencies["tenant_service"] = "healthy"
 	}
+	result.ResponseTimes["tenant_service"] = time.Since(start).Milliseconds()
 	
 	// 检查Redis
-	if err := c.checkRedis(); err != nil {
-		response.Dependencies["redis"] = "unhealthy"
-		response.Status = "unhealthy"
+	start = time.Now()
+	if err := c.checkRedis(ctx); err != nil {
+		result.Dependencies["redis"] = "unhealthy"
+		result.Status = "unhealthy"
 		c.logger.WithError(err).Error("Redis健康检查失败")
 	} else {
-		response.Dependencies["redis"] = "healthy"
+		result.Dependencies["redis"] = "healthy"
+	}
+	result.ResponseTimes["redis"] = time.Since(start).Milliseconds()
+	
+	// 检查数据库（通过租户服务间接检查）
+	start = time.Now()
+	if err := c.checkDatabase(ctx); err != nil {
+		result.Dependencies["database"] = "unhealthy"
+		result.Status = "unhealthy"
+		c.logger.WithError(err).Error("数据库健康检查失败")
+	} else {
+		result.Dependencies["database"] = "healthy"
+	}
+	result.ResponseTimes["database"] = time.Since(start).Milliseconds()
+	
+	// 获取系统指标
+	result.Metrics["goroutines"] = runtime.NumGoroutine()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	result.Metrics["memory_mb"] = int(m.Alloc / 1024 / 1024)
+	result.Metrics["cpu_usage"] = 0 // 简化处理，实际应用中可以获取CPU使用率
+	
+	return result
+}
+
+// CheckHealth 执行健康检查（兼容性方法）
+func (c *Checker) CheckHealth() *models.HealthResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	result := c.Check(ctx)
+	
+	response := &models.HealthResponse{
+		Status:       result.Status,
+		Timestamp:    time.Now().Format(time.RFC3339),
+		Version:      "1.0.0",
+		Dependencies: result.Dependencies,
+		Metrics:      result.Metrics,
 	}
 	
 	// 获取凭证统计
@@ -74,17 +122,17 @@ func (c *Checker) CheckHealth() *models.HealthResponse {
 }
 
 // checkTenantService 检查租户服务
-func (c *Checker) checkTenantService() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	
+func (c *Checker) checkTenantService(ctx context.Context) error {
 	return c.tenantClient.HealthCheck(ctx)
 }
 
 // checkRedis 检查Redis
-func (c *Checker) checkRedis() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	
+func (c *Checker) checkRedis(ctx context.Context) error {
 	return c.redisClient.Ping(ctx).Err()
+}
+
+// checkDatabase 检查数据库（通过租户服务间接检查）
+func (c *Checker) checkDatabase(ctx context.Context) error {
+	// 通过租户服务检查数据库连接
+	return c.tenantClient.HealthCheck(ctx)
 }

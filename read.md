@@ -4,7 +4,6 @@
 
   1. 首先阅读 @CLAUDE.md 了解项目概述和开发规范
   2. 然后阅读 @DEVELOPMENT_PRIORITY.md 了解当前开发状态  
-  3. 最后阅读 @CLAUDE_MEMORY.md 了解最新进展
 
   **🎉 重大进展 - 核心微服务全部完成！**
   - ✅ Auth Service (认证服务) - 100%完成

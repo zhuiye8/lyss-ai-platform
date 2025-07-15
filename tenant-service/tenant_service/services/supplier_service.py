@@ -22,6 +22,10 @@ from ..models.schemas.supplier import (
     SupplierCredentialListParams,
     SupplierTestRequest,
     SupplierTestResponse,
+    AvailableProvidersResponse,
+    ProviderModelsResponse,
+    ProviderInfo,
+    ModelInfo,
     SUPPORTED_PROVIDERS
 )
 from ..models.database.supplier_credential import SupplierCredential
@@ -597,3 +601,193 @@ class SupplierService:
             created_at=credential.created_at,
             updated_at=credential.updated_at
         )
+
+    async def get_available_providers(self) -> AvailableProvidersResponse:
+        """
+        获取支持的供应商和模型列表
+        
+        Returns:
+            包含所有支持供应商和模型信息的响应
+        """
+        try:
+            providers = []
+            
+            for provider_name, provider_config in SUPPORTED_PROVIDERS.items():
+                # 构建模型信息列表
+                models = []
+                for model_id, model_config in provider_config.get("models", {}).items():
+                    model_info = ModelInfo(
+                        model_id=model_id,
+                        display_name=model_config["display_name"],
+                        description=model_config["description"],
+                        type=model_config["type"],
+                        context_window=model_config["context_window"],
+                        max_tokens=model_config["max_tokens"],
+                        price_per_1k_tokens=model_config["price_per_1k_tokens"],
+                        features=model_config["features"],
+                        is_available=True
+                    )
+                    models.append(model_info)
+                
+                # 构建供应商信息
+                provider_info = ProviderInfo(
+                    provider_name=provider_name,
+                    display_name=provider_config["display_name"],
+                    description=provider_config["description"],
+                    logo_url=provider_config["logo_url"],
+                    base_url=provider_config.get("base_url"),
+                    models=models
+                )
+                providers.append(provider_info)
+            
+            return AvailableProvidersResponse(providers=providers)
+            
+        except Exception as e:
+            logger.error(
+                "获取支持的供应商列表失败",
+                error=str(e),
+                operation="get_available_providers"
+            )
+            raise
+    
+    async def get_provider_models(self, provider_name: str) -> Optional[ProviderModelsResponse]:
+        """
+        获取指定供应商的模型列表
+        
+        Args:
+            provider_name: 供应商名称
+            
+        Returns:
+            供应商模型信息或None
+        """
+        try:
+            if provider_name not in SUPPORTED_PROVIDERS:
+                return None
+            
+            provider_config = SUPPORTED_PROVIDERS[provider_name]
+            
+            # 构建模型信息列表
+            models = []
+            for model_id, model_config in provider_config.get("models", {}).items():
+                model_info = ModelInfo(
+                    model_id=model_id,
+                    display_name=model_config["display_name"],
+                    description=model_config["description"],
+                    type=model_config["type"],
+                    context_window=model_config["context_window"],
+                    max_tokens=model_config["max_tokens"],
+                    price_per_1k_tokens=model_config["price_per_1k_tokens"],
+                    features=model_config["features"],
+                    is_available=True
+                )
+                models.append(model_info)
+            
+            return ProviderModelsResponse(
+                provider_name=provider_name,
+                display_name=provider_config["display_name"],
+                models=models
+            )
+            
+        except Exception as e:
+            logger.error(
+                "获取供应商模型列表失败",
+                provider_name=provider_name,
+                error=str(e),
+                operation="get_provider_models"
+            )
+            raise
+    
+    async def test_credential_before_save(
+        self,
+        provider_name: str,
+        api_key: str,
+        base_url: Optional[str],
+        test_request: SupplierTestRequest,
+        tenant_id: str,
+        request_id: str
+    ) -> SupplierTestResponse:
+        """
+        在保存前测试供应商凭证
+        
+        Args:
+            provider_name: 供应商名称
+            api_key: API密钥
+            base_url: 基础URL
+            test_request: 测试请求
+            tenant_id: 租户ID
+            request_id: 请求ID
+            
+        Returns:
+            测试结果
+        """
+        try:
+            # 验证供应商名称
+            if provider_name not in SUPPORTED_PROVIDERS:
+                raise ValueError(f"不支持的供应商: {provider_name}")
+            
+            provider_config = SUPPORTED_PROVIDERS[provider_name]
+            
+            # 验证API密钥格式
+            if provider_config.get("api_key_pattern"):
+                import re
+                if not re.match(provider_config["api_key_pattern"], api_key):
+                    raise ValueError(f"API密钥格式不正确")
+            
+            # 使用默认base_url（如果没有提供）
+            final_base_url = base_url or provider_config.get("base_url")
+            
+            # 构建临时凭证数据
+            credential_data = {
+                "provider_name": provider_name,
+                "api_key": api_key,
+                "base_url": final_base_url
+            }
+            
+            start_time = time.time()
+            
+            # 执行测试
+            test_result = await self._perform_provider_test(
+                credential_data, test_request, request_id
+            )
+            
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # 构建测试响应
+            test_response = SupplierTestResponse(
+                success=test_result["success"],
+                test_type=test_request.test_type,
+                response_time_ms=response_time_ms,
+                provider_name=provider_name,
+                model_name=test_request.model_name,
+                result_data=test_result.get("data"),
+                error_message=test_result.get("error_message"),
+                error_code=test_result.get("error_code"),
+                available_models=test_result.get("available_models"),
+                api_version=test_result.get("api_version"),
+                rate_limit_info=test_result.get("rate_limit_info")
+            )
+            
+            logger.info(
+                "供应商凭证测试完成（保存前）",
+                request_id=request_id,
+                tenant_id=tenant_id,
+                provider_name=provider_name,
+                success=test_result["success"],
+                response_time_ms=response_time_ms,
+                operation="test_credential_before_save"
+            )
+            
+            return test_response
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(
+                "供应商凭证测试失败（保存前）",
+                request_id=request_id,
+                tenant_id=tenant_id,
+                provider_name=provider_name,
+                error=str(e),
+                operation="test_credential_before_save"
+            )
+            raise
