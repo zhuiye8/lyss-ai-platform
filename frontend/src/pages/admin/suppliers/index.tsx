@@ -39,9 +39,10 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
 import { SupplierService } from '@/services/supplier';
-import { SupplierCredential, CreateSupplierCredentialRequest, UpdateSupplierCredentialRequest } from '@/types/supplier';
+import { SupplierCredential, CreateSupplierCredentialRequest, UpdateSupplierCredentialRequest, SupplierTestRequest } from '@/types/supplier';
 import { PAGINATION, SUPPLIER_CONFIG } from '@/utils/constants';
 import { handleApiError } from '@/utils/errorHandler';
+import ProviderSelector from '@/components/common/ProviderSelector';
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -84,6 +85,11 @@ const SuppliersPage: React.FC = () => {
   // Form 实例
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
+  
+  // 新增：树形结构相关状态
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [selectedEditProvider, setSelectedEditProvider] = useState<string>('');
+  const [testingConnection, setTestingConnection] = useState(false);
 
   /**
    * 加载供应商凭证数据
@@ -366,6 +372,8 @@ const SuppliersPage: React.FC = () => {
    */
   const handleEditSupplier = (supplier: SupplierCredential) => {
     setCurrentSupplier(supplier);
+    // 设置编辑表单的供应商选择状态
+    setSelectedEditProvider(supplier.provider);
     editForm.setFieldsValue({
       name: supplier.name,
       provider: supplier.provider,
@@ -410,6 +418,69 @@ const SuppliersPage: React.FC = () => {
   };
 
   /**
+   * 保存前测试供应商凭证
+   */
+  const handleTestBeforeSave = async (isEdit: boolean = false) => {
+    const form = isEdit ? editForm : createForm;
+    
+    try {
+      // 验证必要字段
+      await form.validateFields(['provider', 'api_key']);
+      const values = form.getFieldsValue();
+      
+      if (!values.provider || !values.api_key) {
+        message.warning('请先填写供应商和API密钥');
+        return;
+      }
+      
+      setTestingConnection(true);
+      
+      const testData: SupplierTestRequest = {
+        provider_name: values.provider,
+        api_key: values.api_key,
+        base_url: values.api_endpoint,
+        test_config: {
+          timeout: 10,
+          test_message: "Hello, this is a connection test."
+        }
+      };
+      
+      const response = await SupplierService.testSupplierBeforeSave(testData);
+      
+      if (response.success && response.data?.connection_status === 'success') {
+        message.success({
+          content: `连接测试成功！响应时间: ${response.data.response_time_ms || 0}ms`,
+          duration: 3,
+        });
+        
+        // 如果测试成功，显示可用模型信息
+        if (response.data.available_models && response.data.available_models.length > 0) {
+          Modal.info({
+            title: '连接测试成功',
+            content: (
+              <div>
+                <p>响应时间: {response.data.response_time_ms || 0}ms</p>
+                <p>测试方法: {response.data.test_method}</p>
+                <p>可用模型: {response.data.available_models.join(', ')}</p>
+              </div>
+            ),
+          });
+        }
+      } else {
+        message.error({
+          content: `连接测试失败: ${response.data?.error_message || '未知错误'}`,
+          duration: 5,
+        });
+      }
+    } catch (error) {
+      console.error('连接测试失败:', error);
+      handleApiError(error);
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  /**
    * 提交创建表单
    */
   const handleCreateSubmit = async (values: CreateSupplierCredentialRequest & { model_config_text?: string }) => {
@@ -432,6 +503,7 @@ const SuppliersPage: React.FC = () => {
         message.success('创建成功');
         setCreateModalVisible(false);
         createForm.resetFields();
+        setSelectedProvider('');
         loadSuppliers();
       }
     } catch (error) {
@@ -465,6 +537,7 @@ const SuppliersPage: React.FC = () => {
         setEditModalVisible(false);
         editForm.resetFields();
         setCurrentSupplier(null);
+        setSelectedEditProvider('');
         loadSuppliers();
       }
     } catch (error) {
@@ -564,6 +637,7 @@ const SuppliersPage: React.FC = () => {
         onCancel={() => {
           setCreateModalVisible(false);
           createForm.resetFields();
+          setSelectedProvider('');
         }}
         footer={null}
         width={700}
@@ -580,16 +654,18 @@ const SuppliersPage: React.FC = () => {
                 name="provider"
                 rules={[{ required: true, message: '请选择供应商' }]}
               >
-                <Select placeholder="请选择供应商">
-                  {Object.entries(SUPPLIER_CONFIG).map(([key, config]) => (
-                    <Option key={key} value={key.toLowerCase()}>
-                      <Space>
-                        <span>{config.icon}</span>
-                        {config.name}
-                      </Space>
-                    </Option>
-                  ))}
-                </Select>
+                <ProviderSelector
+                  value={selectedProvider}
+                  onChange={(value, providerInfo) => {
+                    setSelectedProvider(value);
+                    createForm.setFieldValue('provider', value);
+                    // 如果有API端点信息，自动填充
+                    if (providerInfo?.base_url) {
+                      createForm.setFieldValue('api_endpoint', providerInfo.base_url);
+                    }
+                  }}
+                  placeholder="请选择供应商"
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -607,6 +683,22 @@ const SuppliersPage: React.FC = () => {
             label="API密钥"
             name="api_key"
             rules={[{ required: true, message: '请输入API密钥' }]}
+            extra={
+              <Space style={{ marginTop: 8 }}>
+                <Button
+                  type="link"
+                  size="small"
+                  loading={testingConnection}
+                  onClick={() => handleTestBeforeSave(false)}
+                  disabled={!selectedProvider}
+                >
+                  🧪 测试连接
+                </Button>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  建议在保存前测试连接确保凭证有效
+                </Text>
+              </Space>
+            }
           >
             <Input.Password placeholder="请输入API密钥" />
           </Form.Item>
@@ -647,6 +739,7 @@ const SuppliersPage: React.FC = () => {
               <Button onClick={() => {
                 setCreateModalVisible(false);
                 createForm.resetFields();
+                setSelectedProvider('');
               }}>
                 取消
               </Button>
@@ -663,6 +756,7 @@ const SuppliersPage: React.FC = () => {
           setEditModalVisible(false);
           editForm.resetFields();
           setCurrentSupplier(null);
+          setSelectedEditProvider('');
         }}
         footer={null}
         width={700}
@@ -679,16 +773,18 @@ const SuppliersPage: React.FC = () => {
                 name="provider"
                 rules={[{ required: true, message: '请选择供应商' }]}
               >
-                <Select placeholder="请选择供应商">
-                  {Object.entries(SUPPLIER_CONFIG).map(([key, config]) => (
-                    <Option key={key} value={key.toLowerCase()}>
-                      <Space>
-                        <span>{config.icon}</span>
-                        {config.name}
-                      </Space>
-                    </Option>
-                  ))}
-                </Select>
+                <ProviderSelector
+                  value={selectedEditProvider}
+                  onChange={(value, providerInfo) => {
+                    setSelectedEditProvider(value);
+                    editForm.setFieldValue('provider', value);
+                    // 如果有API端点信息，自动填充
+                    if (providerInfo?.base_url) {
+                      editForm.setFieldValue('api_endpoint', providerInfo.base_url);
+                    }
+                  }}
+                  placeholder="请选择供应商"
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -705,7 +801,22 @@ const SuppliersPage: React.FC = () => {
           <Form.Item
             label="API密钥"
             name="api_key"
-            extra="留空表示不修改现有密钥"
+            extra={
+              <Space style={{ marginTop: 8 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  留空表示不修改现有密钥
+                </Text>
+                <Button
+                  type="link"
+                  size="small"
+                  loading={testingConnection}
+                  onClick={() => handleTestBeforeSave(true)}
+                  disabled={!selectedEditProvider}
+                >
+                  🧪 测试连接
+                </Button>
+              </Space>
+            }
           >
             <Input.Password placeholder="请输入新的API密钥（可选）" />
           </Form.Item>
@@ -746,6 +857,7 @@ const SuppliersPage: React.FC = () => {
                 setEditModalVisible(false);
                 editForm.resetFields();
                 setCurrentSupplier(null);
+                setSelectedEditProvider('');
               }}>
                 取消
               </Button>

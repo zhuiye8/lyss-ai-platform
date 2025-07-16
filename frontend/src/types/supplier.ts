@@ -126,3 +126,67 @@ export interface SupplierLimits {
   tokens_per_day?: number;
   concurrent_requests?: number;
 }
+
+// 供应商树形结构 - 用于动态获取支持的供应商和模型
+export interface ProviderTreeNode {
+  provider_name: string;
+  display_name: string;
+  logo_url?: string;
+  description: string;
+  base_url: string;
+  models: ProviderModelInfo[];
+}
+
+// 供应商模型详细信息
+export interface ProviderModelInfo {
+  model_id: string;
+  display_name: string;
+  description: string;
+  type: 'chat' | 'completion' | 'embedding' | 'image' | 'audio' | 'multimodal';
+  context_window: number;
+  max_tokens: number;
+  price_per_1k_tokens: {
+    input: number;
+    output: number;
+  };
+  features: string[];
+  is_available?: boolean;
+}
+
+// 获取可用供应商树形结构响应
+export interface AvailableProvidersResponse {
+  providers: ProviderTreeNode[];
+}
+
+// 获取单个供应商模型响应  
+export interface ProviderModelsResponse {
+  provider_name: string;
+  display_name: string;
+  models: ProviderModelInfo[];
+}
+
+// 保存前凭证测试请求
+export interface SupplierTestRequest {
+  provider_name: string;
+  api_key: string;
+  base_url?: string;
+  test_config?: {
+    timeout?: number;
+    test_message?: string;
+  };
+}
+
+// 保存前凭证测试响应
+export interface SupplierTestResponse {
+  connection_status: 'success' | 'failed';
+  provider_name: string;
+  test_method: string;
+  response_time_ms?: number;
+  available_models?: string[];
+  test_details?: {
+    endpoint_tested: string;
+    status_code: number;
+  };
+  error_message?: string;
+  error_type?: string;
+}

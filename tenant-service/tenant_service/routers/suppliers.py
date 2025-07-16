@@ -510,6 +510,7 @@ async def test_supplier_credential(
 )
 async def get_available_providers(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     request_id: str = Depends(get_request_id),
     tenant_id: str = Depends(get_current_tenant_id)
 ) -> ApiResponse[AvailableProvidersResponse]:
@@ -561,6 +562,7 @@ async def get_available_providers(
 async def get_provider_models(
     provider_name: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
     request_id: str = Depends(get_request_id),
     tenant_id: str = Depends(get_current_tenant_id)
 ) -> ApiResponse[ProviderModelsResponse]:

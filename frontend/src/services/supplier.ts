@@ -11,7 +11,11 @@ import {
   ConnectionTestResult,
   SupplierStats,
   SupplierUsageHistory,
-  ModelInfo
+  ModelInfo,
+  AvailableProvidersResponse,
+  ProviderModelsResponse,
+  SupplierTestRequest,
+  SupplierTestResponse
 } from '@/types/supplier';
 import { ApiResponse, PaginatedResponse, PaginationParams } from '@/types/common';
 
@@ -365,6 +369,57 @@ export class SupplierService {
       return response;
     } catch (error) {
       console.error('获取供应商配额信息失败:', error);
+      throw error;
+    }
+  }
+
+  // ==================== 新增：树形结构API方法 ====================
+
+  /**
+   * 获取支持的供应商和模型树形结构
+   * 调用新的后端API: GET /api/v1/admin/suppliers/available
+   */
+  static async getAvailableProviders(): Promise<ApiResponse<AvailableProvidersResponse>> {
+    try {
+      const response = await httpClient.get<ApiResponse<AvailableProvidersResponse>>(
+        `${this.BASE_URL}/available`
+      );
+      return response;
+    } catch (error) {
+      console.error('获取支持的供应商和模型树形结构失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取指定供应商的模型列表
+   * 调用新的后端API: GET /api/v1/admin/suppliers/providers/{provider_name}/models
+   */
+  static async getProviderModelsByName(providerName: string): Promise<ApiResponse<ProviderModelsResponse>> {
+    try {
+      const response = await httpClient.get<ApiResponse<ProviderModelsResponse>>(
+        `${this.BASE_URL}/providers/${providerName}/models`
+      );
+      return response;
+    } catch (error) {
+      console.error(`获取供应商 ${providerName} 的模型列表失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 保存前测试供应商凭证
+   * 调用新的后端API: POST /api/v1/admin/suppliers/test
+   */
+  static async testSupplierBeforeSave(data: SupplierTestRequest): Promise<ApiResponse<SupplierTestResponse>> {
+    try {
+      const response = await httpClient.post<ApiResponse<SupplierTestResponse>>(
+        `${this.BASE_URL}/test`,
+        data
+      );
+      return response;
+    } catch (error) {
+      console.error('保存前测试供应商凭证失败:', error);
       throw error;
     }
   }

@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 重要提醒 - 项目状态更新 (2025-07-15)
+## 🚨 重要提醒 - 项目状态更新 (2025-07-16)
 
-**当前项目状态**: 🎉 EINO服务Go架构实现完成！凭证管理对接成功，准备启动和集成测试  
+**当前项目状态**: 🎨 前端AI对话界面现代化重构完成80%，正在进行界面架构重新设计  
 **如果你是继续开发的Claude**: 
-1. 请务必先阅读 `DEVELOPMENT_PRIORITY.md` 文件，快速了解当前开发状态和下一步任务
-2. 参考 `docs/eino_service.md` 了解EINO服务的完整设计
-3. 查看已有的代码结构，特别是 `eino-service/` 目录和 `tenant-service/routers/internal.py` 的新内部接口
+1. 请务必先阅读 `/root/work/lyss-ai-platform/read.md` 文件，快速了解当前开发状态和紧急任务
+2. 参考 `docs/frontend.md` 了解前端技术栈和Ant Design X集成规范
+3. 查看 `image.png` 截图了解当前界面问题（三个用户头像冗余）
+4. 重点关注 `frontend/src/components/layout/AdminLayout.tsx` 需要重构为对话历史侧边栏
 
 ### 已完成的基础工作
 - ✅ **项目架构设计和文档 (100%)**
@@ -40,22 +41,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 与Auth Service和Tenant Service无缝集成
   - ✅ 错误处理和数据传递优化完成！
 
-- ✅ **Frontend - 前端应用 (基础登录100%)** (2025-07-14)
-  - React + TypeScript + Ant Design架构
+- 🎨 **Frontend - 前端应用 (AI对话界面现代化80%)** (2025-07-16)
+  - ✅ React 18 + TypeScript + Ant Design 5.x + Ant Design X架构
   - ✅ 登录功能完全正常！JWT认证集成
-  - ✅ HTTP拦截器和数据格式处理修复完成
-  - ⏳ 管理界面等待后端API完成
+  - ✅ AI对话页面现代化：使用Ant Design X的Bubble和Sender组件
+  - ✅ 现代化主题配色方案（从深色改为浅色主题）
+  - ✅ 响应式设计支持和流式响应功能
+  - ⚠️ 界面架构需重构：当前有冗余用户头像，侧边栏需改为对话历史
+  - ⏳ 对话历史侧边栏和智能总结功能待实现
 
-### 下一步工作重点
-1. **Tenant Service 管理API补全** (优先级: 高) - 当前开发目标
-2. **Frontend 管理界面实现** (优先级: 高) 
-3. **EINO Service + Memory Service** (优先级: 中)
+### 下一步工作重点 (2025-07-16更新)
+1. **Frontend 界面架构重构** (优先级: 紧急) - 当前开发目标
+   - 重新设计AdminLayout：顶部菜单栏 + 对话历史侧边栏 + 主对话区域
+   - 解决三个用户头像冗余问题，只保留右上角
+   - 移除内容页冗余标头，节约空间
+   - 实现可收回/展开的对话历史侧边栏
+2. **对话历史和智能总结功能** (优先级: 高)
+   - 集成Mem0AI和小模型用于对话总结
+   - 参考ChatGPT/Gemini的先进设计模式
+3. **后端API服务补全** (优先级: 中)
+   - Tenant Service 管理API补全
+   - EINO Service + Memory Service集成
 
 ### 核心开发要求
 1. **全程使用中文注释和回复**
 2. **严格遵循项目开发规范**
-3. **及时更新项目进度文档**
-4. **确保多租户数据隔离和安全性**
+3. **优先解决用户体验问题** - 界面布局和空间利用
+4. **保持现有功能完整性** - 重构过程中不破坏已实现功能
+5. **参考先进设计模式** - ChatGPT、Gemini、Grok等AI平台界面
+6. **确保多租户数据隔离和安全性**
 
 ## 项目概述
 

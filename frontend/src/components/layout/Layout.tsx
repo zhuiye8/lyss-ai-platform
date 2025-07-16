@@ -1,13 +1,13 @@
 /**
- * 现代化AI对话平台布局组件
- * 参考ChatGPT/Gemini设计，采用对话历史侧边栏 + 顶部导航栏的现代化布局
- * 专为AI对话场景优化，最大化对话空间利用率
+ * 主布局组件 - 参考Ant Design Pro最佳实践
+ * 统一的布局设计，适用于所有用户角色
+ * 采用现代化对话历史侧边栏 + 顶部导航栏的设计
  */
 
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Layout,
+  Layout as AntLayout,
   Button,
   Dropdown,
   Avatar,
@@ -25,7 +25,6 @@ import {
   Menu,
   List,
   Breadcrumb,
-  Affix,
 } from 'antd';
 import {
   MenuFoldOutlined,
@@ -36,17 +35,14 @@ import {
   SettingOutlined,
   LogoutOutlined,
   BellOutlined,
-  SearchOutlined,
   QuestionCircleOutlined,
   CloudOutlined,
   MessageOutlined,
-  HistoryOutlined,
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
   MoreOutlined,
   HomeOutlined,
-  PushpinOutlined,
   CommentOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/store/auth';
@@ -55,7 +51,7 @@ import { ConversationService } from '@/services/conversation';
 import { handleApiError } from '@/utils/errorHandler';
 import dayjs from 'dayjs';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Sider, Content } = AntLayout;
 const { Text } = Typography;
 const { Search } = Input;
 
@@ -73,13 +69,19 @@ interface Conversation {
   summary?: string;
 }
 
-// 快捷导航菜单配置 - 专注于核心功能
-const quickMenuItems = [
+// 主导航菜单配置 - 参考Ant Design Pro顶部导航设计
+const mainMenuItems = [
   {
     key: 'dashboard',
     label: '工作台',
     icon: <DashboardOutlined />,
     path: ROUTES.DASHBOARD,
+  },
+  {
+    key: 'chat',
+    label: 'AI对话',
+    icon: <MessageOutlined />,
+    path: '/chat',
   },
   {
     key: 'admin',
@@ -108,7 +110,7 @@ const quickMenuItems = [
   },
 ];
 
-const AdminLayout: React.FC = () => {
+const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -215,9 +217,9 @@ const AdminLayout: React.FC = () => {
     return breadcrumbs;
   };
 
-  // 快捷菜单点击事件
-  const handleQuickMenuClick = ({ key }: { key: string }) => {
-    const findMenuItem = (items: typeof quickMenuItems, menuKey: string): any => {
+  // 主导航菜单点击事件
+  const handleMainMenuClick = ({ key }: { key: string }) => {
+    const findMenuItem = (items: typeof mainMenuItems, menuKey: string): any => {
       for (const item of items) {
         if (item.key === menuKey) {
           return item;
@@ -230,7 +232,7 @@ const AdminLayout: React.FC = () => {
       return undefined;
     };
 
-    const menuItem = findMenuItem(quickMenuItems, key);
+    const menuItem = findMenuItem(mainMenuItems, key);
     if (menuItem) {
       navigate(menuItem.path);
     }
@@ -247,13 +249,13 @@ const AdminLayout: React.FC = () => {
       key: 'profile',
       label: '个人中心',
       icon: <UserOutlined />,
-      onClick: () => navigate(ROUTES.PROFILE),
+      onClick: () => navigate('/profile'),
     },
     {
       key: 'settings',
       label: '设置',
       icon: <SettingOutlined />,
-      onClick: () => navigate(ROUTES.SETTINGS),
+      onClick: () => navigate('/settings'),
     },
     {
       type: 'divider' as const,
@@ -266,8 +268,8 @@ const AdminLayout: React.FC = () => {
     },
   ];
 
-  // 过滤快捷菜单项（根据用户权限）
-  const filterQuickMenuItems = (items: typeof quickMenuItems) => {
+  // 过滤主导航菜单项（根据用户权限）
+  const filterMainMenuItems = (items: typeof mainMenuItems) => {
     return items.filter(item => {
       // 非管理员不能访问管理中心
       if (item.key === 'admin' && !isAdmin) {
@@ -278,7 +280,7 @@ const AdminLayout: React.FC = () => {
   };
 
   // 转换为 Ant Design Menu 的数据结构
-  const convertToMenuItems = (items: typeof quickMenuItems): any[] => {
+  const convertToMenuItems = (items: typeof mainMenuItems): any[] => {
     return items.map(item => {
       if (item.children) {
         return {
@@ -296,11 +298,11 @@ const AdminLayout: React.FC = () => {
     });
   };
 
-  const filteredQuickMenuItems = filterQuickMenuItems(quickMenuItems);
-  const antdMenuItems = convertToMenuItems(filteredQuickMenuItems);
+  const filteredMainMenuItems = filterMainMenuItems(mainMenuItems);
+  const antdMenuItems = convertToMenuItems(filteredMainMenuItems);
 
   return (
-    <Layout style={{ minHeight: '100vh', backgroundColor: token.colorBgLayout }}>
+    <AntLayout style={{ minHeight: '100vh', backgroundColor: token.colorBgLayout }}>
       {/* 现代化对话历史侧边栏 */}
       <Sider
         trigger={null}
@@ -569,8 +571,8 @@ const AdminLayout: React.FC = () => {
       </Sider>
 
       {/* 主内容区域 */}
-      <Layout style={{ marginLeft: isMobile && !collapsed ? 0 : 0 }}>
-        {/* 现代化顶部导航栏 */}
+      <AntLayout style={{ marginLeft: isMobile && !collapsed ? 0 : 0 }}>
+        {/* 现代化顶部导航栏 - 参考Ant Design Pro设计 */}
         <Header
           style={{
             padding: '0 24px',
@@ -600,29 +602,18 @@ const AdminLayout: React.FC = () => {
               }}
             />
 
-            {/* 现代化面包屑导航 */}
-            <Breadcrumb
-              separator="/"
-              items={generateBreadcrumbs().map((item, index) => ({
-                title: index === 0 ? (
-                  <HomeOutlined style={{ fontSize: 16, color: token.colorTextTertiary }} />
-                ) : (
-                  <span
-                    onClick={() => navigate(item.path)}
-                    style={{
-                      cursor: 'pointer',
-                      color: index === generateBreadcrumbs().length - 1 
-                        ? token.colorTextBase 
-                        : token.colorTextSecondary,
-                      fontWeight: index === generateBreadcrumbs().length - 1 ? 500 : 400,
-                      transition: 'color 0.2s ease',
-                    }}
-                  >
-                    {item.title}
-                  </span>
-                ),
-              }))}
+            {/* 主导航菜单 - 参考Ant Design Pro最佳实践 */}
+            <Menu
+              theme="light"
+              mode="horizontal"
+              selectedKeys={[location.pathname.split('/')[1] || 'dashboard']}
+              items={antdMenuItems}
+              onClick={handleMainMenuClick}
               style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                flex: 1,
+                minWidth: 0,
                 fontSize: 14,
                 fontWeight: 500,
               }}
@@ -630,27 +621,7 @@ const AdminLayout: React.FC = () => {
           </Flex>
 
           <Flex align="center" gap={8}>
-            {/* 快捷操作菜单 */}
-            <Dropdown 
-              menu={{ 
-                items: antdMenuItems,
-                onClick: handleQuickMenuClick,
-              }} 
-              placement="bottomRight"
-              trigger={['click']}
-            >
-              <Button
-                type="text"
-                icon={<SettingOutlined />}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 8,
-                  color: token.colorTextSecondary,
-                }}
-              />
-            </Dropdown>
-
+            {/* 右侧工具栏 */}
             <Tooltip title="通知消息">
               <Badge count={0} size="small">
                 <Button
@@ -688,7 +659,7 @@ const AdminLayout: React.FC = () => {
               }} 
             />
 
-            {/* 现代化用户菜单 - 只保留右上角一个 */}
+            {/* 用户头像菜单 - 只保留右上角一个 */}
             <Dropdown 
               menu={{ items: userDropdownItems }} 
               placement="bottomRight"
@@ -716,7 +687,7 @@ const AdminLayout: React.FC = () => {
                   src={user?.avatar}
                   style={{
                     backgroundColor: token.colorPrimary,
-                    marginRight: 8,
+                    marginRight: !isMobile ? 8 : 0,
                     border: `2px solid ${token.colorBgContainer}`,
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
                   }}
@@ -763,7 +734,7 @@ const AdminLayout: React.FC = () => {
         >
           <Outlet />
         </Content>
-      </Layout>
+      </AntLayout>
 
       {/* 移动端遮罩层 */}
       {isMobile && !collapsed && (
@@ -780,8 +751,8 @@ const AdminLayout: React.FC = () => {
           onClick={() => setCollapsed(true)}
         />
       )}
-    </Layout>
+    </AntLayout>
   );
 };
 
-export default AdminLayout;
+export default Layout;
