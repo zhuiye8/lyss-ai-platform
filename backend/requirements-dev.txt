@@ -1,0 +1,20 @@
+# 开发环境依赖包
+-r requirements.txt
+
+# 测试工具
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx==0.25.0  # 测试HTTP客户端
+
+# 代码质量
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+bandit==1.7.5
+
+# 开发工具
+pre-commit==3.5.0
+watchdog==3.0.0

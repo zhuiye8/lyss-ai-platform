@@ -1,0 +1,30 @@
+# Auth Service 依赖配置
+# 严格按照 docs/auth_service.md 规范文档要求
+
+# FastAPI 核心框架
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# JWT 认证和加密
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# HTTP 客户端 (调用 Tenant Service)
+httpx==0.25.0
+
+# 数据验证和序列化
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Redis 缓存
+redis==5.0.1
+
+# 结构化日志
+structlog==23.2.0
+
+# 环境配置
+python-dotenv==1.0.0
+
+# 时间处理
+python-dateutil==2.8.2

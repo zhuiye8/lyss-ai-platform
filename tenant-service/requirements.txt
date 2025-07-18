@@ -1,0 +1,37 @@
+# Lyss AI Platform - Tenant Service 依赖
+
+# ===== 核心框架 =====
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# ===== 数据库和ORM =====
+sqlalchemy==2.0.21
+asyncpg==0.28.0  # PostgreSQL异步驱动
+alembic==1.12.0  # 数据库迁移
+
+# ===== 数据验证和序列化 =====
+pydantic==2.5.0
+pydantic[email]==2.5.0
+pydantic-settings
+
+# ===== 认证和安全 =====
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==41.0.7
+
+# ===== HTTP客户端 =====
+httpx==0.25.0
+
+# ===== 数据库连接池 =====
+psycopg2-binary==2.9.7
+
+# ===== JSON和日期处理 =====
+python-dateutil==2.8.2
+orjson==3.9.9
+
+# ===== 环境配置 =====
+python-dotenv==1.0.0
+
+# ===== 日志和监控 =====
+structlog==23.2.0

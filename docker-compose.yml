@@ -1,138 +1,124 @@
-# 基础设施服务 - 仅包含数据库、缓存等基础服务
-# 用于本地开发时只启动必要的基础服务，应用服务在本地运行
+# Lyss AI Platform 基础设施服务配置
+# 用于本地开发环境的数据库、缓存和向量存储服务
 
 services:
-  # PostgreSQL 数据库
+  # PostgreSQL 主数据库
   postgres:
-    image: pgvector/pgvector:pg16
-    container_name: lyss-postgres-dev
+    image: postgres:15-alpine
+    container_name: lyss-postgres
     environment:
       POSTGRES_DB: lyss_db
       POSTGRES_USER: lyss
-      POSTGRES_PASSWORD: 123456
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./sql/init:/docker-entrypoint-initdb.d
+      POSTGRES_PASSWORD: test
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
-      - "5432:5432"
-    networks:
-      - lyss-dev-network
-    restart: unless-stopped
-    command: postgres -c log_statement=all -c log_duration=on -c log_min_duration_statement=0
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    command:
+      - "postgres"
+      - "-c"
+      - "log_statement=all"
+      - "-c"
+      - "log_destination=stderr"
+      - "-c"
+      - "logging_collector=on"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lyss -d lyss_db"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Redis 缓存 - 升级到Redis 8获得显著性能提升
-  redis:
-    image: redis:8.0-alpine
-    container_name: lyss-redis-dev
-    command: redis-server --appendonly yes --loglevel debug --requirepass lyss_redis_dev_password
-    volumes:
-      - redis_dev_data:/data
-    ports:
-      - "6379:6379"
-    networks:
-      - lyss-dev-network
     restart: unless-stopped
+    networks:
+      - lyss-network
+
+  # Redis 缓存和会话存储
+  redis:
+    image: redis:7-alpine
+    container_name: lyss-redis
+    environment:
+      REDIS_PASSWORD:
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - lyss-network
 
-  # PgAdmin - 数据库管理工具，固定版本确保稳定性
-  pgadmin:
-    image: dpage/pgadmin4:8.14
-    container_name: lyss-pgadmin-dev
+  # Qdrant 向量数据库 (用于 Memory Service)
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: lyss-qdrant
     environment:
-      PGADMIN_DEFAULT_EMAIL: dev@lyss.ai
-      PGADMIN_DEFAULT_PASSWORD: devpassword
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    volumes:
-      - pgadmin_dev_data:/var/lib/pgadmin
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__LOG_LEVEL: INFO
     ports:
-      - "5050:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - lyss-dev-network
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
+    networks:
+      - lyss-network
 
-  # Redis Commander - Redis管理工具
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: lyss-redis-commander-dev
+  # MinIO 对象存储 (可选，用于文件上传等功能)
+  minio:
+    image: minio/minio:latest
+    container_name: lyss-minio
     environment:
-      REDIS_HOSTS: local:redis:6379:0:lyss_redis_dev_password
+      MINIO_ROOT_USER: lyss_minio_admin
+      MINIO_ROOT_PASSWORD: lyss_minio_password_2025
     ports:
-      - "8081:8081"
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - lyss-dev-network
-    restart: unless-stopped
-
-  # Prometheus - 监控（可选），固定版本确保稳定性
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: lyss-prometheus-dev
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
+      - "9000:9000"   # API端口
+      - "9001:9001"   # Console端口
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_dev_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - lyss-dev-network
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
     restart: unless-stopped
-    profiles:
-      - monitoring
-
-  # Grafana - 监控面板（可选），固定版本确保稳定性
-  grafana:
-    image: grafana/grafana:11.3.0
-    container_name: lyss-grafana-dev
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_dev_data:/var/lib/grafana
-    ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
     networks:
-      - lyss-dev-network
-    restart: unless-stopped
-    profiles:
-      - monitoring
+      - lyss-network
 
-networks:
-  lyss-dev-network:
-    driver: bridge
-    name: lyss-dev-network
-
+# 数据卷定义
 volumes:
-  postgres_dev_data:
-    name: lyss_postgres_dev_data
-  redis_dev_data:
-    name: lyss_redis_dev_data
-  pgadmin_dev_data:
-    name: lyss_pgadmin_dev_data
-  prometheus_dev_data:
-    name: lyss_prometheus_dev_data
-  grafana_dev_data:
-    name: lyss_grafana_dev_data
+  postgres_data:
+    driver: local
+    name: lyss_postgres_data
+  redis_data:
+    driver: local  
+    name: lyss_redis_data
+  qdrant_data:
+    driver: local
+    name: lyss_qdrant_data
+  minio_data:
+    driver: local
+    name: lyss_minio_data
+
+# 网络定义
+networks:
+  lyss-network:
+    driver: bridge
+    name: lyss-network

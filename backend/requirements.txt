@@ -1,58 +1,29 @@
-# Core FastAPI dependencies - 修复CVE-2024-24762等安全漏洞
-fastapi==0.116.0
-uvicorn[standard]==0.34.0
-gunicorn==23.0.0
+# Backend API Gateway 依赖包
+# FastAPI 核心框架
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 
-# Database - 更新到最新稳定版本
-sqlalchemy==2.0.36
-alembic==1.14.0
-asyncpg==0.30.0
-psycopg2-binary==2.9.10
+# HTTP客户端
+httpx==0.25.0
+aiohttp==3.8.6
 
-# Redis - 升级到最新版本，支持Redis 8
-redis==6.2.0
-hiredis==3.1.0
-
-# Authentication & Security - 修复CVE-2024-33663算法混淆漏洞
+# 认证和安全
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.12
-pydantic==2.10.3
-pydantic-settings==2.7.0
+python-multipart==0.0.6
+pyjwt
 
-# HTTP clients - 更新到最新版本
-httpx==0.28.1
-aiohttp==3.11.10
+# 数据验证和序列化
+pydantic==2.5.0
+pydantic-settings==2.0.3
 
-# Monitoring & Logging - 更新到最新版本
-prometheus-client==0.21.1
-structlog==25.1.0
-opentelemetry-api==1.33.0
-opentelemetry-sdk==1.33.0
-opentelemetry-exporter-otlp==1.33.0  # 替换弃用的jaeger导出器
-opentelemetry-instrumentation-fastapi==0.54b0
-opentelemetry-instrumentation-requests==0.54b0
-opentelemetry-instrumentation-sqlalchemy==0.54b0
+# 日志和监控
+structlog==23.2.0
+python-json-logger==2.0.7
 
-# Memory integration - 更新到最新版本
-mem0ai==0.1.114
+# 缓存
+redis==5.0.1
 
-# Testing - 更新测试框架到最新版本
-pytest==8.3.4
-pytest-asyncio==0.24.0
-pytest-cov==6.0.0
-httpx==0.28.1  # 与上面HTTP客户端版本保持一致
-factory-boy==3.3.1  # 修正依赖名称
-
-# Development - 更新开发工具到最新版本
-black==24.10.0
-isort==5.13.2
-flake8==7.1.1
-mypy==1.14.0
-pre-commit==4.0.1
-
-# Utilities - 更新工具库到最新版本
-python-dotenv==1.0.1
-click==8.1.8
-typer==0.15.1
-rich==13.9.4
+# 工具库
+python-dotenv==1.0.0
+click==8.1.7

@@ -2,157 +2,159 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
-// Config holds all configuration for the EINO service
+// Config EINO服务配置结构
 type Config struct {
-	Environment string
-	Server      ServerConfig
-	Database    DatabaseConfig
-	Redis       RedisConfig
-	Monitoring  MonitoringConfig
-	AI          AIConfig
-	Workflow    WorkflowConfig
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	Services     ServicesConfig     `mapstructure:"services"`
+	Logging      LoggingConfig      `mapstructure:"logging"`
+	Credential   CredentialConfig   `mapstructure:"credential"`
+	Workflows    WorkflowsConfig    `mapstructure:"workflows"`
 }
 
-// ServerConfig holds HTTP server configuration
+// ServerConfig 服务器配置
 type ServerConfig struct {
-	Port         string
-	Host         string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
+	Host         string        `mapstructure:"host"`
+	Port         int           `mapstructure:"port"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
 }
 
-// DatabaseConfig holds database configuration
+// DatabaseConfig 数据库配置
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Database string
-	SSLMode  string
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	Database string `mapstructure:"database"`
+	SSLMode  string `mapstructure:"ssl_mode"`
 }
 
-// RedisConfig holds Redis configuration
+// RedisConfig Redis配置
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Password string
-	DB       int
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
 }
 
-// MonitoringConfig holds monitoring configuration
-type MonitoringConfig struct {
-	JaegerEndpoint string
-	LogLevel       string
-	MetricsEnabled bool
+// ServicesConfig 依赖服务配置
+type ServicesConfig struct {
+	TenantService TenantServiceConfig `mapstructure:"tenant_service"`
+	MemoryService MemoryServiceConfig `mapstructure:"memory_service"`
 }
 
-// AIConfig holds AI provider configuration
-type AIConfig struct {
-	DefaultProvider string
-	Timeout         time.Duration
-	MaxRetries      int
+// TenantServiceConfig 租户服务配置
+type TenantServiceConfig struct {
+	BaseURL string        `mapstructure:"base_url"`
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
-// WorkflowConfig holds workflow engine configuration
-type WorkflowConfig struct {
-	MaxConcurrency   int
-	ExecutionTimeout time.Duration
-	RetryAttempts    int
-	RetryDelay       time.Duration
+// MemoryServiceConfig 记忆服务配置
+type MemoryServiceConfig struct {
+	BaseURL string        `mapstructure:"base_url"`
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
-// Load loads configuration from environment variables
-func Load() (*Config, error) {
-	config := &Config{
-		Environment: getEnv("ENVIRONMENT", "development"),
-		Server: ServerConfig{
-			Port:         getEnv("SERVER_PORT", "8080"),
-			Host:         getEnv("SERVER_HOST", "0.0.0.0"),
-			ReadTimeout:  getDurationEnv("SERVER_READ_TIMEOUT", 30*time.Second),
-			WriteTimeout: getDurationEnv("SERVER_WRITE_TIMEOUT", 30*time.Second),
-		},
-		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "lyss_user"),
-			Password: getEnv("DB_PASSWORD", "lyss_password"),
-			Database: getEnv("DB_NAME", "lyss_platform"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
-		},
-		Redis: RedisConfig{
-			Host:     getEnv("REDIS_HOST", "localhost"),
-			Port:     getEnv("REDIS_PORT", "6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
-			DB:       getIntEnv("REDIS_DB", 0),
-		},
-		Monitoring: MonitoringConfig{
-			JaegerEndpoint: getEnv("JAEGER_ENDPOINT", "http://jaeger:14268/api/traces"),
-			LogLevel:       getEnv("LOG_LEVEL", "info"),
-			MetricsEnabled: getBoolEnv("METRICS_ENABLED", true),
-		},
-		AI: AIConfig{
-			DefaultProvider: getEnv("AI_DEFAULT_PROVIDER", "openai"),
-			Timeout:         getDurationEnv("AI_TIMEOUT", 30*time.Second),
-			MaxRetries:      getIntEnv("AI_MAX_RETRIES", 3),
-		},
-		Workflow: WorkflowConfig{
-			MaxConcurrency:   getIntEnv("WORKFLOW_MAX_CONCURRENCY", 100),
-			ExecutionTimeout: getDurationEnv("WORKFLOW_EXECUTION_TIMEOUT", 5*time.Minute),
-			RetryAttempts:    getIntEnv("WORKFLOW_RETRY_ATTEMPTS", 3),
-			RetryDelay:       getDurationEnv("WORKFLOW_RETRY_DELAY", 1*time.Second),
-		},
+// LoggingConfig 日志配置
+type LoggingConfig struct {
+	Level      string `mapstructure:"level"`
+	Format     string `mapstructure:"format"`
+	Output     string `mapstructure:"output"`
+	MaxSize    int    `mapstructure:"max_size"`
+	MaxBackups int    `mapstructure:"max_backups"`
+	MaxAge     int    `mapstructure:"max_age"`
+}
+
+// CredentialConfig 凭证管理配置
+type CredentialConfig struct {
+	CacheTTL           time.Duration `mapstructure:"cache_ttl"`
+	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
+	MaxConcurrentTests int           `mapstructure:"max_concurrent_tests"`
+}
+
+// WorkflowsConfig 工作流配置
+type WorkflowsConfig struct {
+	MaxConcurrentExecutions int           `mapstructure:"max_concurrent_executions"`
+	ExecutionTimeout        time.Duration `mapstructure:"execution_timeout"`
+	DefaultStrategy         string        `mapstructure:"default_strategy"`
+}
+
+// LoadConfig 加载配置
+func LoadConfig(configPath string) (*Config, error) {
+	viper.SetConfigFile(configPath)
+	viper.SetConfigType("yaml")
+	
+	// 设置默认值
+	setDefaultValues()
+	
+	// 环境变量支持
+	viper.SetEnvPrefix("EINO")
+	viper.AutomaticEnv()
+	
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("读取配置文件失败: %w", err)
 	}
-
-	return config, nil
-}
-
-// GetDSN returns the database connection string
-func (d *DatabaseConfig) GetDSN() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		d.Host, d.Port, d.User, d.Password, d.Database, d.SSLMode)
-}
-
-// GetRedisAddr returns the Redis address
-func (r *RedisConfig) GetRedisAddr() string {
-	return fmt.Sprintf("%s:%s", r.Host, r.Port)
-}
-
-// Helper functions
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+	
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("解析配置文件失败: %w", err)
 	}
-	return defaultValue
+	
+	return &config, nil
 }
 
-func getIntEnv(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
-
-func getBoolEnv(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		if boolValue, err := strconv.ParseBool(value); err == nil {
-			return boolValue
-		}
-	}
-	return defaultValue
-}
-
-func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
+// setDefaultValues 设置默认配置值
+func setDefaultValues() {
+	// 服务器默认配置
+	viper.SetDefault("server.host", "0.0.0.0")
+	viper.SetDefault("server.port", 8003)
+	viper.SetDefault("server.read_timeout", "30s")
+	viper.SetDefault("server.write_timeout", "30s")
+	viper.SetDefault("server.idle_timeout", "120s")
+	
+	// 数据库默认配置
+	viper.SetDefault("database.host", "localhost")
+	viper.SetDefault("database.port", 5432)
+	viper.SetDefault("database.username", "lyss_user")
+	viper.SetDefault("database.password", "lyss_dev_password_2025")
+	viper.SetDefault("database.database", "lyss_platform")
+	viper.SetDefault("database.ssl_mode", "disable")
+	
+	// Redis默认配置
+	viper.SetDefault("redis.host", "localhost")
+	viper.SetDefault("redis.port", 6379)
+	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.db", 0)
+	
+	// 依赖服务默认配置
+	viper.SetDefault("services.tenant_service.base_url", "http://localhost:8002")
+	viper.SetDefault("services.tenant_service.timeout", "30s")
+	viper.SetDefault("services.memory_service.base_url", "http://localhost:8004")
+	viper.SetDefault("services.memory_service.timeout", "30s")
+	
+	// 日志默认配置
+	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.format", "json")
+	viper.SetDefault("logging.output", "stdout")
+	viper.SetDefault("logging.max_size", 100)
+	viper.SetDefault("logging.max_backups", 3)
+	viper.SetDefault("logging.max_age", 7)
+	
+	// 凭证管理默认配置
+	viper.SetDefault("credential.cache_ttl", "5m")
+	viper.SetDefault("credential.health_check_interval", "2m")
+	viper.SetDefault("credential.max_concurrent_tests", 10)
+	
+	// 工作流默认配置
+	viper.SetDefault("workflows.max_concurrent_executions", 100)
+	viper.SetDefault("workflows.execution_timeout", "5m")
+	viper.SetDefault("workflows.default_strategy", "first_available")
 }

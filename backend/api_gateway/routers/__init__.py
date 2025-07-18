@@ -1,1 +1,5 @@
-# API Gateway Routers
+"""
+路由模块
+
+提供API路由和处理器
+"""

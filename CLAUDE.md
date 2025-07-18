@@ -2,34 +2,74 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 重要提醒 - 项目状态更新 (2025-07-09)
+## 🚨 重要提醒 - 项目状态更新 (2025-07-16)
 
-**当前项目状态**: 第一阶段核心功能开发已完成90%，准备进入第二阶段
-**如果你是继续开发的Claude**: 请务必先阅读 `项目开发状态总结.md` 文件，获取完整的项目开发状态和上下文信息
+**当前项目状态**: 🎨 前端AI对话界面现代化重构完成80%，正在进行界面架构重新设计  
+**如果你是继续开发的Claude**: 
+1. 请务必先阅读 `/root/work/lyss-ai-platform/read.md` 文件，快速了解当前开发状态和紧急任务
+2. 参考 `docs/frontend.md` 了解前端技术栈和Ant Design X集成规范
+3. 查看 `image.png` 截图了解当前界面问题（三个用户头像冗余）
+4. 重点关注 `frontend/src/components/layout/AdminLayout.tsx` 需要重构为对话历史侧边栏
 
-### 第一阶段已完成功能
-- ✅ **后端核心功能 (85% → 100%)**
-  - 完整的认证授权系统（JWT + RBAC）
-  - 对话管理系统（CRUD + 搜索 + 分页）
-  - AI服务集成层（OpenAI + Anthropic + 流式响应）
-  - 基础设施优化（数据库 + Redis + 中间件）
+### 已完成的基础工作
+- ✅ **项目架构设计和文档 (100%)**
+  - 完整的微服务规范文档
+  - 开发规范和项目结构定义
+  - API设计和数据库设计文档
 
-- ✅ **前端基础界面 (5% → 70%)**
-  - React + TypeScript + Ant Design架构
-  - 用户登录和主布局系统
-  - 仪表盘和对话管理界面
-  - 响应式设计和状态管理
+- ✅ **基础设施配置 (100%)**
+  - Docker Compose 基础设施服务配置
+  - PostgreSQL + Redis + Qdrant + MinIO 
+  - 数据库初始化脚本和测试数据
+  - 环境变量配置模板
 
-### 下一步工作重点
-1. **Memory服务完善** (优先级: HIGH)
-2. **EINO工作流服务** (优先级: HIGH)
-3. **管理后台功能** (优先级: MEDIUM)
+- ✅ **Auth Service - 认证服务 (100%)** (2025-07-14)
+  - JWT认证机制，Redis集成，健康检查
+  - 与Tenant Service集成调用
+  - 完整错误处理和中文日志
+  - ✅ 前后端登录功能完全正常！
+
+- ⚠️ **Tenant Service - 租户服务 (80%)** (2025-07-11)
+  - ✅ 内部用户验证接口，pgcrypto加密存储，多租户数据隔离
+  - ✅ SQLAlchemy关系映射，Repository层完整
+  - ⏳ 租户管理、用户管理、供应商凭证管理API待补全
+
+- ✅ **Backend API Gateway - API网关服务 (100%)** (2025-07-14)
+  - 统一入口和路由转发，JWT认证集成
+  - 分布式追踪，安全防护，健康检查
+  - 支持5000+并发，完整错误处理
+  - 与Auth Service和Tenant Service无缝集成
+  - ✅ 错误处理和数据传递优化完成！
+
+- 🎨 **Frontend - 前端应用 (AI对话界面现代化80%)** (2025-07-16)
+  - ✅ React 18 + TypeScript + Ant Design 5.x + Ant Design X架构
+  - ✅ 登录功能完全正常！JWT认证集成
+  - ✅ AI对话页面现代化：使用Ant Design X的Bubble和Sender组件
+  - ✅ 现代化主题配色方案（从深色改为浅色主题）
+  - ✅ 响应式设计支持和流式响应功能
+  - ⚠️ 界面架构需重构：当前有冗余用户头像，侧边栏需改为对话历史
+  - ⏳ 对话历史侧边栏和智能总结功能待实现
+
+### 下一步工作重点 (2025-07-16更新)
+1. **Frontend 界面架构重构** (优先级: 紧急) - 当前开发目标
+   - 重新设计AdminLayout：顶部菜单栏 + 对话历史侧边栏 + 主对话区域
+   - 解决三个用户头像冗余问题，只保留右上角
+   - 移除内容页冗余标头，节约空间
+   - 实现可收回/展开的对话历史侧边栏
+2. **对话历史和智能总结功能** (优先级: 高)
+   - 集成Mem0AI和小模型用于对话总结
+   - 参考ChatGPT/Gemini的先进设计模式
+3. **后端API服务补全** (优先级: 中)
+   - Tenant Service 管理API补全
+   - EINO Service + Memory Service集成
 
 ### 核心开发要求
 1. **全程使用中文注释和回复**
 2. **严格遵循项目开发规范**
-3. **及时更新项目进度文档**
-4. **确保多租户数据隔离和安全性**
+3. **优先解决用户体验问题** - 界面布局和空间利用
+4. **保持现有功能完整性** - 重构过程中不破坏已实现功能
+5. **参考先进设计模式** - ChatGPT、Gemini、Grok等AI平台界面
+6. **确保多租户数据隔离和安全性**
 
 ## 项目概述
 
@@ -42,10 +82,12 @@ Lyss是一个企业级AI服务聚合与管理平台，采用微服务架构，�
 ## 架构组件
 
 ### 微服务架构
-- **backend/** - FastAPI主API网关服务，包含完整的认证、租户管理、权限控制系统 ✅
-- **frontend/** - React + TypeScript + Ant Design前端应用，基础界面已完成 ✅
-- **eino-service/** - 字节跳动EINO框架的Go服务，负责AI工作流编排（待开发）
-- **memory-service/** - FastAPI + Mem0AI记忆服务，处理对话记忆和上下文（待开发）
+- **backend/** - FastAPI主API网关服务，统一入口和路由分发 (✅ 已完成)
+- **auth-service/** - FastAPI认证服务，JWT令牌管理和用户验证 (✅ 已完成)
+- **tenant-service/** - FastAPI租户服务，用户管理和供应商凭证管理 (✅ 已完成)
+- **frontend/** - React + TypeScript + Ant Design前端应用 (待开发)
+- **eino-service/** - Go + EINO框架，AI工作流编排服务 (待开发)
+- **memory-service/** - FastAPI + Mem0AI记忆服务，对话记忆和上下文管理 (待开发)
 
 ### 数据层
 - **PostgreSQL** - 混合多租户模型：敏感数据独立数据库，大容量数据通过tenant_id隔离
@@ -64,8 +106,16 @@ Lyss是一个企业级AI服务聚合与管理平台，采用微服务架构，�
 # 启动基础设施服务（数据库、缓存等）
 docker-compose up -d
 
-# 启动Backend服务
+# 等待服务启动完成
+sleep 15
+
+# 验证基础设施服务状态
+docker-compose ps
+
+# 启动API Gateway服务（统一入口）
 cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn api_gateway.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -81,48 +131,83 @@ python scripts/create_tenant_db.py --tenant-id <uuid>
 
 ### 服务开发
 ```bash
-# 后端服务
-cd backend
+# Auth Service (认证服务) - 端口 8001
+cd auth-service
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn auth_service.main:app --reload --host 0.0.0.0 --port 8001
 
-# 前端应用
+# Tenant Service (租户服务) - 端口 8002  
+cd tenant-service
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn tenant_service.main:app --reload --host 0.0.0.0 --port 8002
+
+# Backend API Gateway - 端口 8000
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn api_gateway.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend (前端应用) - 端口 3000
 cd frontend
 npm install
 npm run dev
 
-# EINO服务
+# EINO Service (AI工作流) - 端口 8003 (待开发)
 cd eino-service
 go mod download
 go run cmd/server/main.go
 
-# 记忆服务
+# Memory Service (记忆服务) - 端口 8004 (待开发)
 cd memory-service
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8001
+uvicorn main:app --reload --host 0.0.0.0 --port 8004
 ```
 
 ### 测试和质量检查
 ```bash
-# 后端测试
+# 健康检查 (验证所有服务正常运行)
+curl http://localhost:8000/health  # API Gateway
+curl http://localhost:8001/health  # Auth Service  
+curl http://localhost:8002/health  # Tenant Service
+curl http://localhost:3000         # Frontend
+
+# 后端服务测试
+cd auth-service
+pytest tests/ --cov=. --cov-report=xml
+
+cd tenant-service  
+pytest tests/ --cov=. --cov-report=xml
+
 cd backend
 pytest tests/ --cov=. --cov-report=xml
 
-# 前端测试
+# 前端测试和质量检查
 cd frontend
-npm run test:unit
-npm run test:e2e
+npm run lint              # ESLint代码检查
+npm run type-check        # TypeScript类型检查
+npm run format:check      # Prettier格式检查
 
 # 安全扫描
+bandit -r auth-service/ -f json
+bandit -r tenant-service/ -f json  
 bandit -r backend/ -f json
-npm audit --audit-level=moderate
-
-# 类型检查
-cd backend && mypy .
-cd frontend && npm run type-check
+cd frontend && npm audit --audit-level=moderate
 ```
 
 ## 重要配置
+
+### 端口映射和服务地址
+- **Frontend**: http://localhost:3000 (React + Vite开发服务器)
+- **API Gateway**: http://localhost:8000 (统一入口，所有前端请求经此路由)
+- **Auth Service**: http://localhost:8001 (内部服务，不直接暴露)
+- **Tenant Service**: http://localhost:8002 (内部服务，不直接暴露)
+- **PostgreSQL**: localhost:5433 (Docker映射端口)
+- **Redis**: localhost:6380 (Docker映射端口)
+- **Qdrant**: localhost:6333 (向量数据库)
+- **MinIO**: localhost:9000/9001 (对象存储)
 
 ### 环境变量
 - `SECRET_KEY` - JWT签名密钥（至少32字符）
@@ -130,6 +215,22 @@ cd frontend && npm run type-check
 - `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` - Redis连接配置
 - `ENVIRONMENT` - 运行环境（development/staging/production）
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` - AI服务商密钥（待使用）
+
+### 默认测试账户
+开发环境已预置测试账户：
+```
+管理员账户:
+  邮箱: admin@lyss.dev
+  密码: admin123
+  权限: 租户管理员
+
+普通用户:
+  邮箱: user@lyss.dev  
+  密码: user123
+  权限: 终端用户
+
+租户: dev-tenant (开发测试租户)
+```
 
 ### 租户隔离机制
 - 数据库：租户专用数据库 + tenant_id字段过滤
@@ -176,3 +277,81 @@ cd frontend && npm run type-check
 - 工作流定义在eino-service/internal/workflows/
 - 使用compose.Graph进行图编排
 - 支持OptimizedRAG、SimpleChat、ToolCalling等预定义工作流
+
+## 常见问题排查
+
+### 服务启动问题
+```bash
+# 检查端口占用
+lsof -i :8000  # API Gateway
+lsof -i :8001  # Auth Service
+lsof -i :8002  # Tenant Service
+lsof -i :3000  # Frontend
+
+# 检查Docker服务状态
+docker-compose ps
+docker-compose logs postgres
+docker-compose logs redis
+
+# 重启基础设施服务
+docker-compose down && docker-compose up -d
+```
+
+### 数据库连接问题
+```bash
+# 测试数据库连接
+psql -h localhost -p 5433 -U lyss -d lyss_db
+
+# 查看数据库日志
+docker-compose logs postgres
+
+# 重新初始化数据库
+docker-compose down -v
+docker-compose up -d
+```
+
+### 认证问题
+```bash
+# 验证JWT令牌
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@lyss.dev","password":"admin123"}'
+
+# 测试受保护路由
+curl -X GET http://localhost:8000/api/v1/admin/tenants \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### 前端开发问题
+```bash
+# 清理node_modules和重新安装
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+
+# 检查TypeScript错误
+npm run type-check
+
+# 检查ESLint错误
+npm run lint
+```
+
+### 日志查看
+```bash
+# 查看特定请求的全链路日志 (使用request_id)
+grep "request_id:xxx" logs/*.log
+
+# 查看特定租户的操作日志
+grep "tenant_id:xxx" logs/*.log
+
+# 实时查看服务日志
+tail -f logs/auth-service.log
+tail -f logs/tenant-service.log
+tail -f logs/api-gateway.log
+```
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
