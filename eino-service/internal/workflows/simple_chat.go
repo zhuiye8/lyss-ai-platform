@@ -7,7 +7,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"lyss-ai-platform/eino-service/internal/models"
 	"lyss-ai-platform/eino-service/internal/workflows/nodes"
 	"lyss-ai-platform/eino-service/pkg/credential"
 )
@@ -58,7 +57,7 @@ func (w *SimpleChatWorkflow) Execute(ctx context.Context, req *WorkflowRequest) 
 		return &WorkflowResponse{
 			Success:         false,
 			ErrorMessage:    fmt.Sprintf("输入验证失败: %s", err.Error()),
-			ExecutionTimeMs: int(time.Since(startTime).Milliseconds()),
+			ExecutionTimeMs: time.Since(startTime).Milliseconds(),
 		}, err
 	}
 
@@ -121,7 +120,7 @@ func (w *SimpleChatWorkflow) Execute(ctx context.Context, req *WorkflowRequest) 
 		return &WorkflowResponse{
 			Success:         false,
 			ErrorMessage:    fmt.Sprintf("聊天模型节点执行失败: %s", err.Error()),
-			ExecutionTimeMs: int(time.Since(startTime).Milliseconds()),
+			ExecutionTimeMs: time.Since(startTime).Milliseconds(),
 		}, err
 	}
 
@@ -134,8 +133,12 @@ func (w *SimpleChatWorkflow) Execute(ctx context.Context, req *WorkflowRequest) 
 		Content:         result.Data["response"].(string),
 		Model:           nodeCtx.State["model"].(string),
 		WorkflowType:    "simple_chat",
-		ExecutionTimeMs: int(time.Since(startTime).Milliseconds()),
-		Usage:           *result.TokenUsage,
+		ExecutionTimeMs: time.Since(startTime).Milliseconds(),
+		Usage: &TokenUsage{
+			PromptTokens:     result.TokenUsage.PromptTokens,
+			CompletionTokens: result.TokenUsage.CompletionTokens,
+			TotalTokens:      result.TokenUsage.TotalTokens,
+		},
 		Metadata: map[string]interface{}{
 			"workflow_type":    "simple_chat",
 			"nodes_executed":   []string{"chat_model"},
@@ -211,13 +214,26 @@ func (w *SimpleChatWorkflow) GetOutputSchema() map[string]interface{} {
 	}
 }
 
-// GetWorkflowInfo 获取工作流信息
-func (w *SimpleChatWorkflow) GetWorkflowInfo() *WorkflowInfo {
+// GetInfo 获取工作流信息
+func (w *SimpleChatWorkflow) GetInfo() *WorkflowInfo {
 	return &WorkflowInfo{
 		Name:        "simple_chat",
+		DisplayName: "简单聊天",
 		Description: "简单聊天工作流，直接调用AI模型进行对话",
 		Version:     "1.0.0",
 		Type:        "chat",
+		Parameters: []WorkflowParameter{
+			{
+				Name:        "message",
+				Type:        "string",
+				Required:    true,
+				Description: "用户输入的消息",
+			},
+		},
+		SupportedFeatures: []string{
+			"basic_chat",
+			"streaming",
+		},
 		Nodes: []WorkflowNodeInfo{
 			{
 				Name:        "chat_model",
@@ -229,4 +245,84 @@ func (w *SimpleChatWorkflow) GetWorkflowInfo() *WorkflowInfo {
 		RequiredInputs: w.GetRequiredInputs(),
 		OutputSchema:   w.GetOutputSchema(),
 	}
+}
+
+// ExecuteStream 流式执行工作流
+func (w *SimpleChatWorkflow) ExecuteStream(ctx context.Context, req *WorkflowRequest) (<-chan *WorkflowStreamResponse, error) {
+	responseChan := make(chan *WorkflowStreamResponse, 10)
+
+	go func() {
+		defer close(responseChan)
+
+		w.logger.WithFields(logrus.Fields{
+			"execution_id":  req.ExecutionID,
+			"tenant_id":     req.TenantID,
+			"user_id":       req.UserID,
+			"workflow_type": "simple_chat",
+			"operation":     "workflow_stream_start",
+		}).Info("开始流式执行简单聊天工作流")
+
+		// 发送开始事件
+		responseChan <- &WorkflowStreamResponse{
+			Type:        "start",
+			ExecutionID: req.ExecutionID,
+			Data:        map[string]any{"message": "简单聊天工作流开始执行"},
+		}
+
+		// 执行工作流（简化版本）
+		response, err := w.Execute(ctx, req)
+		if err != nil {
+			responseChan <- &WorkflowStreamResponse{
+				Type:        "error",
+				ExecutionID: req.ExecutionID,
+				Error:       err.Error(),
+			}
+			return
+		}
+
+		// 模拟流式输出
+		words := []string{"这是", "简单", "聊天", "工作流", "的", "响应"}
+		var fullContent string
+		
+		for _, word := range words {
+			fullContent += word
+			
+			responseChan <- &WorkflowStreamResponse{
+				Type:        "chunk",
+				ExecutionID: req.ExecutionID,
+				Content:     fullContent,
+				Data: map[string]any{
+					"content": fullContent,
+					"delta":   word,
+				},
+			}
+			
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		// 发送结束事件
+		responseChan <- &WorkflowStreamResponse{
+			Type:        "end",
+			ExecutionID: req.ExecutionID,
+			Data: map[string]any{
+				"message": "简单聊天工作流执行完成",
+				"usage": map[string]int{
+					"prompt_tokens":     response.Usage.PromptTokens,
+					"completion_tokens": response.Usage.CompletionTokens,
+					"total_tokens":      response.Usage.TotalTokens,
+				},
+				"execution_time_ms": response.ExecutionTimeMs,
+			},
+		}
+
+		w.logger.WithFields(logrus.Fields{
+			"execution_id":  req.ExecutionID,
+			"tenant_id":     req.TenantID,
+			"user_id":       req.UserID,
+			"workflow_type": "simple_chat",
+			"operation":     "workflow_stream_success",
+		}).Info("简单聊天流式工作流执行成功")
+	}()
+
+	return responseChan, nil
 }

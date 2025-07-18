@@ -66,16 +66,28 @@ func (wm *WorkflowManager) Initialize() error {
 
 // registerBuiltinWorkflows 注册内置工作流
 func (wm *WorkflowManager) registerBuiltinWorkflows() error {
-	// 注册简单聊天工作流
+	// 注册标准EINO聊天工作流（主要工作流）
+	einoChatWorkflow := NewEINOStandardChatWorkflow(wm.credentialManager, wm.logger)
+	if err := wm.registry.RegisterWorkflow("eino_standard_chat", einoChatWorkflow); err != nil {
+		return fmt.Errorf("注册标准EINO聊天工作流失败: %w", err)
+	}
+
+	// 注册简单聊天工作流（兼容性）
 	simpleChatWorkflow := NewSimpleChatWorkflow(wm.credentialManager, wm.logger)
 	if err := wm.registry.RegisterWorkflow("simple_chat", simpleChatWorkflow); err != nil {
 		return fmt.Errorf("注册简单聊天工作流失败: %w", err)
 	}
 
-	// TODO: 注册其他内置工作流
-	// - OptimizedRAG工作流
-	// - ToolCalling工作流
-	// - MultiStepChat工作流
+	// 注册标准EINO聊天工作流（旧版本兼容）
+	standardEinoChatWorkflow := NewStandardEINOChatWorkflow(wm.credentialManager, wm.logger)
+	if err := wm.registry.RegisterWorkflow("standard_eino_chat", standardEinoChatWorkflow); err != nil {
+		return fmt.Errorf("注册标准EINO聊天工作流失败: %w", err)
+	}
+
+	// TODO: 注册其他EINO工作流
+	// - RAG工作流（基于EINO Graph）
+	// - Tool调用工作流（基于EINO Tools）
+	// - 多步对话工作流
 
 	return nil
 }

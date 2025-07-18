@@ -2,13 +2,11 @@ package credential
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
 	"lyss-ai-platform/eino-service/internal/client"

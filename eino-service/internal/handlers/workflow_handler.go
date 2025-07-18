@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -110,8 +109,12 @@ func (h *WorkflowHandler) ExecuteWorkflow(c *gin.Context) {
 		Content:         response.Content,
 		Model:           response.Model,
 		WorkflowType:    response.WorkflowType,
-		ExecutionTimeMs: response.ExecutionTimeMs,
-		Usage:           response.Usage,
+		ExecutionTimeMs: int(response.ExecutionTimeMs),
+		Usage: models.TokenUsage{
+			PromptTokens:     response.Usage.PromptTokens,
+			CompletionTokens: response.Usage.CompletionTokens,
+			TotalTokens:      response.Usage.TotalTokens,
+		},
 		Metadata:        response.Metadata,
 	}
 

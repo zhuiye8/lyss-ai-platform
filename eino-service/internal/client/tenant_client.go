@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -36,10 +35,10 @@ func NewTenantClient(config *config.TenantServiceConfig, logger *logrus.Logger) 
 
 // GetAvailableCredentials 获取可用凭证列表
 func (c *TenantClient) GetAvailableCredentials(tenantID string, selector *models.CredentialSelector) ([]*models.SupplierCredential, error) {
-	url := fmt.Sprintf("%s/internal/suppliers/%s/available", c.baseURL, tenantID)
+	requestURL := fmt.Sprintf("%s/internal/suppliers/%s/available", c.baseURL, tenantID)
 	
 	// 构建查询参数
-	params := make(url.Values)
+	params := url.Values{}
 	if selector != nil {
 		params.Add("strategy", selector.Strategy)
 		params.Add("only_active", fmt.Sprintf("%t", selector.Filters.OnlyActive))
@@ -49,15 +48,15 @@ func (c *TenantClient) GetAvailableCredentials(tenantID string, selector *models
 	}
 	
 	if len(params) > 0 {
-		url += "?" + params.Encode()
+		requestURL += "?" + params.Encode()
 	}
 	
 	c.logger.WithFields(logrus.Fields{
 		"tenant_id": tenantID,
-		"url":       url,
+		"url":       requestURL,
 	}).Debug("获取可用凭证列表")
 	
-	resp, err := c.httpClient.Get(url)
+	resp, err := c.httpClient.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %w", err)
 	}

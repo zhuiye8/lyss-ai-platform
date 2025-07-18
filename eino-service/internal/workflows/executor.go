@@ -139,7 +139,13 @@ func (e *DefaultWorkflowExecutor) ExecuteStream(ctx context.Context, req *Workfl
 		responseCh <- &WorkflowStreamResponse{
 			Type:    "data",
 			Content: response.Content,
-			Data:    response,
+			Data: map[string]any{
+				"content":           response.Content,
+				"model":            response.Model,
+				"workflow_type":    response.WorkflowType,
+				"execution_time_ms": response.ExecutionTimeMs,
+				"usage":            response.Usage,
+			},
 		}
 		
 		// 发送完成信号
@@ -176,9 +182,9 @@ func (e *DefaultWorkflowExecutor) GetExecutionStatus(executionID string) (*Workf
 	}
 
 	// 执行时间
-	executionTime := int(time.Now().UnixMilli() - execCtx.StartTime)
+	executionTime := time.Now().UnixMilli() - execCtx.StartTime
 	if execCtx.EndTime > 0 {
-		executionTime = int(execCtx.EndTime - execCtx.StartTime)
+		executionTime = execCtx.EndTime - execCtx.StartTime
 	}
 
 	return &WorkflowExecutionStatus{

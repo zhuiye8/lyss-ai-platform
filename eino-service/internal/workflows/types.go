@@ -2,7 +2,6 @@ package workflows
 
 import (
 	"context"
-	"lyss-ai-platform/eino-service/internal/models"
 )
 
 // WorkflowEngine 工作流引擎接口
@@ -10,11 +9,11 @@ type WorkflowEngine interface {
 	// Execute 执行工作流
 	Execute(ctx context.Context, req *WorkflowRequest) (*WorkflowResponse, error)
 	
-	// GetWorkflowInfo 获取工作流信息
-	GetWorkflowInfo() *WorkflowInfo
+	// ExecuteStream 流式执行工作流
+	ExecuteStream(ctx context.Context, req *WorkflowRequest) (<-chan *WorkflowStreamResponse, error)
 	
-	// ValidateInput 验证输入
-	ValidateInput(req *WorkflowRequest) error
+	// GetInfo 获取工作流信息
+	GetInfo() *WorkflowInfo
 }
 
 // WorkflowRequest 工作流请求
@@ -25,6 +24,9 @@ type WorkflowRequest struct {
 	UserID        string                 `json:"user_id"`
 	WorkflowType  string                 `json:"workflow_type"`
 	Message       string                 `json:"message"`
+	Model         string                 `json:"model"`
+	Temperature   float64                `json:"temperature"`
+	MaxTokens     int                    `json:"max_tokens"`
 	ModelConfig   map[string]interface{} `json:"model_config"`
 	Configuration map[string]interface{} `json:"configuration"`
 	Stream        bool                   `json:"stream"`
@@ -32,25 +34,46 @@ type WorkflowRequest struct {
 
 // WorkflowResponse 工作流响应
 type WorkflowResponse struct {
+	ID              string                 `json:"id"`
 	Success         bool                   `json:"success"`
 	Content         string                 `json:"content"`
 	Model           string                 `json:"model"`
 	WorkflowType    string                 `json:"workflow_type"`
-	ExecutionTimeMs int                    `json:"execution_time_ms"`
-	Usage           models.TokenUsage      `json:"usage"`
+	Status          string                 `json:"status"`
+	ExecutionTimeMs int64                  `json:"execution_time_ms"`
+	Usage           *TokenUsage            `json:"usage"`
 	Metadata        map[string]interface{} `json:"metadata"`
 	ErrorMessage    string                 `json:"error_message,omitempty"`
 }
 
+// TokenUsage Token使用情况
+type TokenUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 // WorkflowInfo 工作流信息
 type WorkflowInfo struct {
-	Name           string             `json:"name"`
-	Description    string             `json:"description"`
-	Version        string             `json:"version"`
-	Type           string             `json:"type"`
-	Nodes          []WorkflowNodeInfo `json:"nodes"`
-	RequiredInputs []string           `json:"required_inputs"`
-	OutputSchema   map[string]interface{} `json:"output_schema"`
+	Name              string               `json:"name"`
+	DisplayName       string               `json:"display_name"`
+	Description       string               `json:"description"`
+	Version           string               `json:"version"`
+	Type              string               `json:"type"`
+	Parameters        []WorkflowParameter  `json:"parameters"`
+	SupportedFeatures []string             `json:"supported_features"`
+	Nodes             []WorkflowNodeInfo   `json:"nodes"`
+	RequiredInputs    []string             `json:"required_inputs"`
+	OutputSchema      map[string]interface{} `json:"output_schema"`
+}
+
+// WorkflowParameter 工作流参数
+type WorkflowParameter struct {
+	Name        string      `json:"name"`
+	Type        string      `json:"type"`
+	Required    bool        `json:"required"`
+	Description string      `json:"description"`
+	Default     interface{} `json:"default,omitempty"`
 }
 
 // WorkflowNodeInfo 工作流节点信息
@@ -103,6 +126,18 @@ type WorkflowRegistry interface {
 	
 	// IsWorkflowRegistered 检查工作流是否已注册
 	IsWorkflowRegistered(name string) bool
+	
+	// GetWorkflowCount 获取工作流数量
+	GetWorkflowCount() int
+	
+	// GetWorkflowNames 获取所有工作流名称
+	GetWorkflowNames() []string
+	
+	// GetWorkflowInfo 获取工作流信息
+	GetWorkflowInfo(name string) (*WorkflowInfo, error)
+	
+	// UnregisterWorkflow 取消注册工作流
+	UnregisterWorkflow(name string) error
 }
 
 // WorkflowExecutor 工作流执行器接口
@@ -122,10 +157,11 @@ type WorkflowExecutor interface {
 
 // WorkflowStreamResponse 工作流流式响应
 type WorkflowStreamResponse struct {
-	Type    string      `json:"type"`    // "data", "error", "done"
-	Content string      `json:"content"` 
-	Data    interface{} `json:"data"`
-	Error   string      `json:"error,omitempty"`
+	Type        string         `json:"type"`        // "start", "chunk", "end", "error"
+	ExecutionID string         `json:"execution_id"`
+	Content     string         `json:"content"` 
+	Data        map[string]any `json:"data"`
+	Error       string         `json:"error,omitempty"`
 }
 
 // WorkflowExecutionStatus 工作流执行状态
@@ -137,7 +173,7 @@ type WorkflowExecutionStatus struct {
 	Steps           []WorkflowStep `json:"steps"`
 	StartTime       int64          `json:"start_time"`
 	EndTime         int64          `json:"end_time"`
-	ExecutionTimeMs int            `json:"execution_time_ms"`
+	ExecutionTimeMs int64          `json:"execution_time_ms"`
 	Error           string         `json:"error,omitempty"`
 }
 

@@ -1,3 +1,14 @@
-请注意现在出现几个问题，我用 @README.md 中的默认测试账户登陆都提示账户密码错误(auth)，页面提示服务端错误(未提示账户密码错误)，请检查是账户密码更新了但是没更新文档还是因为代码的问题！并且
-  前端还是存在顶部菜单栏一个用户头像及其相关内容，内容页上也存在一个用户头像及其相关内容，顶部菜单栏缺少导航菜单等问题！ 
-  因为我们马上要离开会话了，你把问题整理一下，并简述一下当前项目状况，确保新会话的你能快速介入开发！就放在 @read.md 中，直接覆盖，里面内容我不要了
+(base) root@DESKTOP-F2PJVJI:~/work/lyss-ai-platform/eino-service# go run cmd/server/main.go
+# lyss-ai-platform/eino-service/internal/workflows
+internal/workflows/eino_chat.go:218:71: undefined: eino.CompiledChain
+internal/workflows/eino_chat.go:224:77: undefined: eino.CompiledChain
+internal/workflows/executor.go:142:13: cannot use response (variable of type *WorkflowResponse) as map[string]any value in struct literal
+internal/workflows/manager.go:60:35: wm.registry.GetWorkflowCount undefined (type WorkflowRegistry has no field or method GetWorkflowCount)
+internal/workflows/manager.go:61:35: wm.registry.GetWorkflowNames undefined (type WorkflowRegistry has no field or method GetWorkflowNames)
+internal/workflows/manager.go:71:56: cannot use simpleChatWorkflow (variable of type *SimpleChatWorkflow) as WorkflowEngine value in argument to wm.registry.RegisterWorkflow: *SimpleChatWorkflow does not implement WorkflowEngine (missing method ExecuteStream)
+internal/workflows/manager.go:160:21: wm.registry.GetWorkflowInfo undefined (type WorkflowRegistry has no field or method GetWorkflowInfo)
+internal/workflows/manager.go:236:21: wm.registry.UnregisterWorkflow undefined (type WorkflowRegistry has no field or method UnregisterWorkflow)
+internal/workflows/registry.go:63:43: workflow.GetWorkflowInfo undefined (type WorkflowEngine has no field or method GetWorkflowInfo)
+internal/workflows/registry.go:127:19: workflow.GetWorkflowInfo undefined (type WorkflowEngine has no field or method GetWorkflowInfo)
+internal/workflows/registry.go:127:19: too many errors
+(base) root@DESKTOP-F2PJVJI:~/work/lyss-ai-platform/eino-service# 

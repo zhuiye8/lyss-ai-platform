@@ -60,7 +60,7 @@ func (r *DefaultWorkflowRegistry) ListWorkflows() []WorkflowInfo {
 
 	var workflows []WorkflowInfo
 	for _, workflow := range r.workflows {
-		workflows = append(workflows, *workflow.GetWorkflowInfo())
+		workflows = append(workflows, *workflow.GetInfo())
 	}
 
 	return workflows
@@ -124,7 +124,7 @@ func (r *DefaultWorkflowRegistry) ValidateWorkflow(name string, workflow Workflo
 		return fmt.Errorf("工作流实例不能为空")
 	}
 
-	info := workflow.GetWorkflowInfo()
+	info := workflow.GetInfo()
 	if info == nil {
 		return fmt.Errorf("工作流信息不能为空")
 	}
@@ -156,7 +156,7 @@ func (r *DefaultWorkflowRegistry) GetWorkflowInfo(name string) (*WorkflowInfo, e
 		return nil, err
 	}
 
-	return workflow.GetWorkflowInfo(), nil
+	return workflow.GetInfo(), nil
 }
 
 // GetWorkflowInfos 获取所有工作流信息
@@ -166,7 +166,7 @@ func (r *DefaultWorkflowRegistry) GetWorkflowInfos() map[string]*WorkflowInfo {
 
 	infos := make(map[string]*WorkflowInfo)
 	for name, workflow := range r.workflows {
-		infos[name] = workflow.GetWorkflowInfo()
+		infos[name] = workflow.GetInfo()
 	}
 
 	return infos
