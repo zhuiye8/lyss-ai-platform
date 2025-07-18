@@ -1,14 +1,11 @@
-(base) root@DESKTOP-F2PJVJI:~/work/lyss-ai-platform/eino-service# go run cmd/server/main.go
-# lyss-ai-platform/eino-service/internal/workflows
-internal/workflows/eino_chat.go:218:71: undefined: eino.CompiledChain
-internal/workflows/eino_chat.go:224:77: undefined: eino.CompiledChain
-internal/workflows/executor.go:142:13: cannot use response (variable of type *WorkflowResponse) as map[string]any value in struct literal
-internal/workflows/manager.go:60:35: wm.registry.GetWorkflowCount undefined (type WorkflowRegistry has no field or method GetWorkflowCount)
-internal/workflows/manager.go:61:35: wm.registry.GetWorkflowNames undefined (type WorkflowRegistry has no field or method GetWorkflowNames)
-internal/workflows/manager.go:71:56: cannot use simpleChatWorkflow (variable of type *SimpleChatWorkflow) as WorkflowEngine value in argument to wm.registry.RegisterWorkflow: *SimpleChatWorkflow does not implement WorkflowEngine (missing method ExecuteStream)
-internal/workflows/manager.go:160:21: wm.registry.GetWorkflowInfo undefined (type WorkflowRegistry has no field or method GetWorkflowInfo)
-internal/workflows/manager.go:236:21: wm.registry.UnregisterWorkflow undefined (type WorkflowRegistry has no field or method UnregisterWorkflow)
-internal/workflows/registry.go:63:43: workflow.GetWorkflowInfo undefined (type WorkflowEngine has no field or method GetWorkflowInfo)
-internal/workflows/registry.go:127:19: workflow.GetWorkflowInfo undefined (type WorkflowEngine has no field or method GetWorkflowInfo)
-internal/workflows/registry.go:127:19: too many errors
-(base) root@DESKTOP-F2PJVJI:~/work/lyss-ai-platform/eino-service# 
+注意，以下是我对你在文档中提出的问题的回复！
+1.微服务架构是对AI编码上下文限制的妥协，我们需要使用微服务架构减少你编码时需要阅读的内容，并且通过严格的规范方式让缺少完整上下文的你完成开发。
+2.我不清楚多租户的概念，但是我们的初始需求中需要不同权限的角色，管理员可以配置自己的供应商并使用其提供的模型，也可以配置所在群组的供应商并分发供应商提供的模型给成员，普通成员只可以配置自己的供应商并使用其提供的模型。超级管理员是初始化时既有的，可以增删改查所有用户和管理权限。
+3.供应商分为两种，个人配置供应商，群组配置供应商
+4.注册时使用SMTP服务。可以降低优先级，开发期间使用超级管理员直接创建为主
+5.审计日志确实重了，按你推荐的去处理
+6.权限系统可以优化简化一下，但是该有的不能少
+7.我们的技术架构，我选择了EINO是权衡后的决定，如果有更好的办法可以说出来，我希望我们第一版项目是纯粹的多供应商可切换，可以使用简单工具调用的AI对话平台。后续我们想拓展出两块，一块是正常的AI对话快速使用，另一块就是AI工作流编排(一个平台两种形式)。而EINO提供了各个主流供应商的抽象层，还有工具调用，还有工作流编排等后续可能用到的内容。
+8.我们的技术架构可以简化，优化，但是基本功能需要实现，我们主要需要考虑的就是，认证，权限，供应商凭证管理，AI和智能记忆
+9.同意，我们当前版本明确需要实现功能是对话
+10.只同意基础设施即数据库使用docker部署
