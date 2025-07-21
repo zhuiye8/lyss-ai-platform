@@ -15,7 +15,9 @@ from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 import logging
 
-from app.core.config import settings
+from .config import get_settings
+
+settings = get_settings()
 
 logger = logging.getLogger(__name__)
 

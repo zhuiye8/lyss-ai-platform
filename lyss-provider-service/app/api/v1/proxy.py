@@ -15,10 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.core.security import get_tenant_context, TenantContext
-from app.models.request import ChatRequest
-from app.models.response import ChatResponse, ErrorResponse
-from app.proxy.handler import proxy_handler
+from ...core.security import get_tenant_context, TenantContext
+from ...models.schemas.proxy import ChatRequest, ChatResponse, ErrorResponse
+from ...proxy.handler import proxy_handler
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -206,10 +205,15 @@ async def list_models(
         dict: 可用模型列表（OpenAI格式）
     """
     try:
-        from app.channels.manager import channel_manager
+        from ...services.channel_service import ChannelService
+        from ...core.database import get_db
+        
+        # 获取渠道服务
+        db = next(get_db())
+        channel_service = ChannelService(db)
         
         # 获取租户的所有活跃Channel
-        channels = channel_manager.list_tenant_channels(tenant_context.tenant_id)
+        channels = channel_service.get_active_channels(tenant_context.tenant_id)
         active_channels = [ch for ch in channels if ch.status == "active"]
         
         # 收集所有可用模型
@@ -217,7 +221,7 @@ async def list_models(
         model_set = set()
         
         for channel in active_channels:
-            for model_name in channel.models:
+            for model_name in channel.supported_models or []:
                 if model_name not in model_set:
                     models.append({
                         "id": model_name,
@@ -265,13 +269,18 @@ async def retrieve_model(
         HTTPException 404: 模型不存在
     """
     try:
-        from app.channels.manager import channel_manager
+        from ...services.channel_service import ChannelService
+        from ...core.database import get_db
+        
+        # 获取渠道服务
+        db = next(get_db())
+        channel_service = ChannelService(db)
         
         # 查找提供该模型的Channel
-        channels = channel_manager.list_tenant_channels(tenant_context.tenant_id)
+        channels = channel_service.get_active_channels(tenant_context.tenant_id)
         
         for channel in channels:
-            if model_id in channel.models and channel.status == "active":
+            if model_id in (channel.supported_models or []) and channel.status == "active":
                 return {
                     "id": model_id,
                     "object": "model",
@@ -309,14 +318,24 @@ async def proxy_health_check():
         dict: 健康状态信息
     """
     try:
-        from app.channels.manager import channel_manager
+        from ...services.channel_service import ChannelService
+        from ...services.health_check_service import HealthCheckService
+        from ...core.database import get_db
         
-        # 检查Channel管理器状态
-        total_channels = len(channel_manager.channels)
+        # 获取服务
+        db = next(get_db())
+        channel_service = ChannelService(db)
+        health_service = HealthCheckService(db)
+        
+        # 获取渠道状态
+        all_channels = channel_service.get_all_channels()
+        total_channels = len(all_channels)
         healthy_channels = 0
         
-        for metrics in channel_manager.channel_metrics.values():
-            if metrics.health_status == "healthy":
+        # 统计健康渠道数量
+        for channel in all_channels:
+            health_status = health_service.get_channel_health_status(channel.channel_id)
+            if health_status.get("status") == "healthy":
                 healthy_channels += 1
         
         # 计算服务健康度
@@ -337,10 +356,7 @@ async def proxy_health_check():
                 "healthy": healthy_channels,
                 "health_ratio": healthy_channels / total_channels if total_channels > 0 else 0
             },
-            "proxy_handler": {
-                "status": "active",
-                "http_client": "connected"
-            }
+            "proxy_handler": proxy_handler.get_handler_stats()
         }
         
     except Exception as e:

@@ -1,96 +1,135 @@
 """
-Channel管理API
+渠道管理API
 
-提供Channel的创建、查询、更新、删除等功能的RESTful API接口。
-实现智能负载均衡和健康监控功能。
+提供渠道的创建、查询、更新、删除等功能的RESTful API接口。
+集成智能负载均衡和健康监控功能。
 
 Author: Lyss AI Team
 Created: 2025-01-21
 Modified: 2025-01-21
 """
 
-from typing import List
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.core.security import get_tenant_context, TenantContext
-from app.channels.manager import channel_manager
-from app.models.channel import (
+from ...core.security import get_tenant_context, TenantContext
+from ...core.database import get_db
+from ...services.channel_service import ChannelService
+from ...services.health_check_service import HealthCheckService
+from ...models.schemas.channel import (
     ChannelCreateRequest, 
-    ChannelResponse, 
-    ChannelStatusResponse,
-    ChannelUpdateRequest
+    ChannelUpdateRequest,
+    ChannelResponse
 )
+from ...models.schemas.common import StandardResponse
 
-router = APIRouter(prefix="/api/v1/channels", tags=["Channel管理"])
+router = APIRouter(prefix="/channels", tags=["渠道管理"])
 
 
-@router.get("/", response_model=List[ChannelResponse])
-async def list_channels(
-    tenant_context: TenantContext = Depends(get_tenant_context)
+def get_channel_service(db: Session = Depends(get_db)) -> ChannelService:
+    """依赖注入：获取渠道服务实例"""
+    return ChannelService(db)
+
+
+def get_health_service(db: Session = Depends(get_db)) -> HealthCheckService:
+    """依赖注入：获取健康检查服务实例"""
+    return HealthCheckService(db)
+
+
+@router.get("/", response_model=StandardResponse[List[Dict[str, Any]]])
+def list_channels(
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service)
 ):
     """
-    获取租户的Channel列表
+    获取租户的渠道列表
     
-    返回当前租户下所有已配置的Channel信息。
+    返回当前租户下所有已配置的渠道信息。
     
     Returns:
-        List[ChannelResponse]: Channel列表
+        StandardResponse[List[Dict[str, Any]]]: 渠道列表
     """
-    return channel_manager.list_tenant_channels(tenant_context.tenant_id)
+    try:
+        channels = channel_service.get_active_channels(tenant_context.tenant_id)
+        
+        channel_list = []
+        for channel in channels:
+            channel_dict = {
+                "channel_id": channel.channel_id,
+                "name": channel.name,
+                "provider_id": channel.provider_id,
+                "status": channel.status,
+                "supported_models": channel.supported_models,
+                "api_base": channel.api_base,
+                "priority": channel.priority,
+                "weight": channel.weight,
+                "max_requests_per_minute": channel.max_requests_per_minute,
+                "success_rate": channel.success_rate,
+                "response_time": channel.response_time,
+                "created_at": channel.created_at.isoformat() if channel.created_at else None,
+                "updated_at": channel.updated_at.isoformat() if channel.updated_at else None
+            }
+            channel_list.append(channel_dict)
+        
+        return StandardResponse(
+            success=True,
+            data=channel_list,
+            message=f"成功获取 {len(channel_list)} 个渠道"
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取渠道列表失败: {str(e)}"
+        )
 
 
-@router.post("/", response_model=ChannelResponse)
-async def create_channel(
+@router.post("/", response_model=StandardResponse[Dict[str, Any]])
+def create_channel(
     channel_data: ChannelCreateRequest,
-    tenant_context: TenantContext = Depends(get_tenant_context)
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service)
 ):
     """
-    创建新Channel
+    创建新渠道
     
-    为租户创建一个新的Channel，用于访问指定的AI供应商。
+    为租户创建一个新的渠道，用于访问指定的AI供应商。
     
     Args:
-        channel_data: Channel创建数据
+        channel_data: 渠道创建数据
         
     Returns:
-        ChannelResponse: 创建的Channel信息
+        StandardResponse[Dict[str, Any]]: 创建的渠道信息
         
     Raises:
         HTTPException 400: 创建失败（供应商不存在、凭证无效等）
     """
     try:
-        channel_id = await channel_manager.register_channel(
-            channel_data, 
-            tenant_context.tenant_id
-        )
+        # 创建渠道数据
+        create_data = channel_data.dict()
+        create_data["tenant_id"] = tenant_context.tenant_id
         
-        # 获取创建的Channel信息
-        channel = channel_manager.get_channel(channel_id)
-        if not channel:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Channel创建成功但无法获取详情"
-            )
+        # 创建渠道
+        channel = channel_service.create_channel(create_data)
         
-        # 构建响应
-        from app.providers.registry import provider_registry
-        provider_config = provider_registry.get_provider_config(channel.provider_id)
-        provider_name = provider_config.name if provider_config else channel.provider_id
+        channel_dict = {
+            "channel_id": channel.channel_id,
+            "name": channel.name,
+            "provider_id": channel.provider_id,
+            "status": channel.status,
+            "supported_models": channel.supported_models,
+            "api_base": channel.api_base,
+            "priority": channel.priority,
+            "weight": channel.weight,
+            "max_requests_per_minute": channel.max_requests_per_minute,
+            "created_at": channel.created_at.isoformat() if channel.created_at else None
+        }
         
-        return ChannelResponse(
-            id=channel.id,
-            name=channel.name,
-            provider_id=channel.provider_id,
-            provider_name=provider_name,
-            base_url=channel.base_url,
-            models=channel.models,
-            status=channel.status,
-            health="unknown",  # 新创建的Channel健康状态未知
-            priority=channel.priority,
-            weight=channel.weight,
-            max_requests_per_minute=channel.max_requests_per_minute,
-            created_at=channel.created_at or "",
-            updated_at=channel.updated_at or ""
+        return StandardResponse(
+            success=True,
+            data=channel_dict,
+            message=f"成功创建渠道 {channel.name}"
         )
         
     except ValueError as e:
@@ -101,258 +140,331 @@ async def create_channel(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"创建Channel失败: {str(e)}"
+            detail=f"创建渠道失败: {str(e)}"
         )
 
 
-@router.get("/{channel_id}", response_model=ChannelResponse)
-async def get_channel(
-    channel_id: int,
-    tenant_context: TenantContext = Depends(get_tenant_context)
+@router.get("/{channel_id}", response_model=StandardResponse[Dict[str, Any]])
+def get_channel(
+    channel_id: str,
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service)
 ):
     """
-    获取Channel详情
+    获取渠道详情
     
-    返回指定Channel的详细信息。
+    返回指定渠道的详细信息。
     
     Args:
-        channel_id: Channel ID
+        channel_id: 渠道ID
         
     Returns:
-        ChannelResponse: Channel详细信息
+        StandardResponse[Dict[str, Any]]: 渠道详细信息
         
     Raises:
-        HTTPException 404: Channel不存在或无权限访问
+        HTTPException 404: 渠道不存在或无权限访问
     """
-    channel = channel_manager.get_channel(channel_id)
-    
-    if not channel or channel.tenant_id != tenant_context.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Channel不存在"
+    try:
+        channel = channel_service.get_channel(channel_id, tenant_context.tenant_id)
+        
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="渠道不存在"
+            )
+        
+        channel_dict = {
+            "channel_id": channel.channel_id,
+            "name": channel.name,
+            "provider_id": channel.provider_id,
+            "status": channel.status,
+            "supported_models": channel.supported_models,
+            "api_base": channel.api_base,
+            "priority": channel.priority,
+            "weight": channel.weight,
+            "max_requests_per_minute": channel.max_requests_per_minute,
+            "success_rate": channel.success_rate,
+            "response_time": channel.response_time,
+            "current_requests_per_minute": channel.current_requests_per_minute,
+            "created_at": channel.created_at.isoformat() if channel.created_at else None,
+            "updated_at": channel.updated_at.isoformat() if channel.updated_at else None
+        }
+        
+        return StandardResponse(
+            success=True,
+            data=channel_dict,
+            message="成功获取渠道详情"
         )
-    
-    # 获取供应商名称和健康状态
-    from app.providers.registry import provider_registry
-    provider_config = provider_registry.get_provider_config(channel.provider_id)
-    provider_name = provider_config.name if provider_config else channel.provider_id
-    
-    metrics = channel_manager.channel_metrics.get(channel_id)
-    health_status = metrics.health_status if metrics else "unknown"
-    
-    return ChannelResponse(
-        id=channel.id,
-        name=channel.name,
-        provider_id=channel.provider_id,
-        provider_name=provider_name,
-        base_url=channel.base_url,
-        models=channel.models,
-        status=channel.status,
-        health=health_status,
-        priority=channel.priority,
-        weight=channel.weight,
-        max_requests_per_minute=channel.max_requests_per_minute,
-        created_at=channel.created_at or "",
-        updated_at=channel.updated_at or ""
-    )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取渠道详情失败: {str(e)}"
+        )
 
 
-@router.put("/{channel_id}", response_model=ChannelResponse)
-async def update_channel(
-    channel_id: int,
+@router.put("/{channel_id}", response_model=StandardResponse[Dict[str, Any]])
+def update_channel(
+    channel_id: str,
     update_data: ChannelUpdateRequest,
-    tenant_context: TenantContext = Depends(get_tenant_context)
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service)
 ):
     """
-    更新Channel配置
+    更新渠道配置
     
-    更新指定Channel的配置信息。
+    更新指定渠道的配置信息。
     
     Args:
-        channel_id: Channel ID
+        channel_id: 渠道ID
         update_data: 更新数据
         
     Returns:
-        ChannelResponse: 更新后的Channel信息
+        StandardResponse[Dict[str, Any]]: 更新后的渠道信息
         
     Raises:
-        HTTPException 404: Channel不存在
+        HTTPException 404: 渠道不存在
         HTTPException 400: 更新失败
     """
-    # 验证Channel是否存在且属于当前租户
-    channel = channel_manager.get_channel(channel_id)
-    if not channel or channel.tenant_id != tenant_context.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Channel不存在"
+    try:
+        # 验证渠道存在且属于当前租户
+        channel = channel_service.get_channel(channel_id, tenant_context.tenant_id)
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="渠道不存在"
+            )
+        
+        # 转换更新数据
+        update_dict = update_data.dict(exclude_unset=True)
+        
+        if not update_dict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="没有提供需要更新的字段"
+            )
+        
+        # 执行更新
+        updated_channel = channel_service.update_channel(
+            channel_id=channel_id,
+            tenant_id=tenant_context.tenant_id,
+            update_data=update_dict
         )
-    
-    # 转换更新数据
-    update_dict = {}
-    for field, value in update_data.dict(exclude_unset=True).items():
-        if value is not None:
-            update_dict[field] = value
-    
-    if not update_dict:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="没有提供需要更新的字段"
+        
+        if not updated_channel:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="渠道更新失败"
+            )
+        
+        channel_dict = {
+            "channel_id": updated_channel.channel_id,
+            "name": updated_channel.name,
+            "provider_id": updated_channel.provider_id,
+            "status": updated_channel.status,
+            "supported_models": updated_channel.supported_models,
+            "api_base": updated_channel.api_base,
+            "priority": updated_channel.priority,
+            "weight": updated_channel.weight,
+            "max_requests_per_minute": updated_channel.max_requests_per_minute,
+            "updated_at": updated_channel.updated_at.isoformat() if updated_channel.updated_at else None
+        }
+        
+        return StandardResponse(
+            success=True,
+            data=channel_dict,
+            message=f"成功更新渠道 {updated_channel.name}"
         )
-    
-    # 执行更新
-    success = await channel_manager.update_channel(
-        channel_id=channel_id,
-        update_data=update_dict,
-        tenant_id=tenant_context.tenant_id
-    )
-    
-    if not success:
+        
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Channel更新失败"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新渠道失败: {str(e)}"
         )
-    
-    # 返回更新后的Channel信息
-    updated_channel = channel_manager.get_channel(channel_id)
-    from app.providers.registry import provider_registry
-    provider_config = provider_registry.get_provider_config(updated_channel.provider_id)
-    provider_name = provider_config.name if provider_config else updated_channel.provider_id
-    
-    metrics = channel_manager.channel_metrics.get(channel_id)
-    health_status = metrics.health_status if metrics else "unknown"
-    
-    return ChannelResponse(
-        id=updated_channel.id,
-        name=updated_channel.name,
-        provider_id=updated_channel.provider_id,
-        provider_name=provider_name,
-        base_url=updated_channel.base_url,
-        models=updated_channel.models,
-        status=updated_channel.status,
-        health=health_status,
-        priority=updated_channel.priority,
-        weight=updated_channel.weight,
-        max_requests_per_minute=updated_channel.max_requests_per_minute,
-        created_at=updated_channel.created_at or "",
-        updated_at=updated_channel.updated_at or ""
-    )
 
 
-@router.delete("/{channel_id}")
-async def delete_channel(
-    channel_id: int,
-    tenant_context: TenantContext = Depends(get_tenant_context)
+@router.delete("/{channel_id}", response_model=StandardResponse[None])
+def delete_channel(
+    channel_id: str,
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service)
 ):
     """
-    删除Channel
+    删除渠道
     
-    删除指定的Channel配置。
+    删除指定的渠道配置。
     
     Args:
-        channel_id: Channel ID
+        channel_id: 渠道ID
         
     Returns:
-        dict: 删除结果
+        StandardResponse[None]: 删除结果
         
     Raises:
-        HTTPException 404: Channel不存在
+        HTTPException 404: 渠道不存在
     """
-    success = await channel_manager.delete_channel(channel_id, tenant_context.tenant_id)
-    
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Channel不存在"
+    try:
+        success = channel_service.delete_channel(channel_id, tenant_context.tenant_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="渠道不存在"
+            )
+        
+        return StandardResponse(
+            success=True,
+            message="渠道删除成功"
         )
-    
-    return {"message": "Channel删除成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除渠道失败: {str(e)}"
+        )
 
 
-@router.get("/status/overview")
-async def get_channels_status(
-    tenant_context: TenantContext = Depends(get_tenant_context)
+@router.get("/status/overview", response_model=StandardResponse[Dict[str, Any]])
+def get_channels_status(
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service),
+    health_service: HealthCheckService = Depends(get_health_service)
 ):
     """
-    获取Channel状态概览
+    获取渠道状态概览
     
-    返回租户所有Channel的状态统计信息。
+    返回租户所有渠道的状态统计信息。
     
     Returns:
-        dict: Channel状态概览
+        StandardResponse[Dict[str, Any]]: 渠道状态概览
     """
-    channel_status = channel_manager.get_channel_status(tenant_context.tenant_id)
-    
-    # 统计信息
-    total_channels = len(channel_status)
-    healthy_channels = sum(1 for status in channel_status.values() if status.health == "healthy")
-    unhealthy_channels = sum(1 for status in channel_status.values() if status.health == "unhealthy")
-    active_channels = sum(1 for status in channel_status.values() if status.status == "active")
-    
-    # 平均响应时间
-    avg_response_time = 0
-    if channel_status:
-        total_response_time = sum(status.response_time for status in channel_status.values())
-        avg_response_time = total_response_time / len(channel_status)
-    
-    # 总成功率
-    total_requests = sum(status.request_count for status in channel_status.values())
-    total_errors = sum(status.error_count for status in channel_status.values())
-    overall_success_rate = 1.0
-    if total_requests > 0:
-        overall_success_rate = (total_requests - total_errors) / total_requests
-    
-    return {
-        "summary": {
+    try:
+        # 获取渠道列表
+        channels = channel_service.get_all_tenant_channels(tenant_context.tenant_id)
+        
+        # 统计信息
+        total_channels = len(channels)
+        active_channels = sum(1 for ch in channels if ch.status == "active")
+        healthy_channels = 0
+        total_response_time = 0
+        total_requests = 0
+        total_errors = 0
+        
+        channel_details = []
+        
+        for channel in channels:
+            # 获取健康状态
+            health_status = health_service.get_channel_health_status(channel.channel_id)
+            is_healthy = health_status.get("status") == "healthy"
+            
+            if is_healthy:
+                healthy_channels += 1
+            
+            # 累计统计数据
+            total_response_time += channel.response_time or 0
+            # 这里应该从metrics获取实际的请求和错误数据
+            # 暂时使用模拟数据
+            
+            channel_detail = {
+                "channel_id": channel.channel_id,
+                "name": channel.name,
+                "provider_id": channel.provider_id,
+                "status": channel.status,
+                "health": "healthy" if is_healthy else "unhealthy",
+                "success_rate": channel.success_rate or 0.0,
+                "response_time": channel.response_time or 0.0,
+                "current_requests": channel.current_requests_per_minute or 0
+            }
+            channel_details.append(channel_detail)
+        
+        # 计算平均响应时间
+        avg_response_time = (total_response_time / total_channels) if total_channels > 0 else 0
+        
+        # 计算总成功率
+        overall_success_rate = 1.0
+        if total_requests > 0:
+            overall_success_rate = (total_requests - total_errors) / total_requests
+        
+        summary = {
             "total_channels": total_channels,
             "active_channels": active_channels,
             "healthy_channels": healthy_channels,
-            "unhealthy_channels": unhealthy_channels,
+            "unhealthy_channels": total_channels - healthy_channels,
             "average_response_time": round(avg_response_time, 2),
             "overall_success_rate": round(overall_success_rate, 4),
             "total_requests": total_requests,
             "total_errors": total_errors
-        },
-        "channels": list(channel_status.values())
-    }
+        }
+        
+        return StandardResponse(
+            success=True,
+            data={
+                "summary": summary,
+                "channels": channel_details
+            },
+            message="成功获取渠道状态概览"
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取渠道状态失败: {str(e)}"
+        )
 
 
-@router.post("/{channel_id}/test")
-async def test_channel(
-    channel_id: int,
-    tenant_context: TenantContext = Depends(get_tenant_context)
+@router.post("/{channel_id}/test", response_model=StandardResponse[Dict[str, Any]])
+async def test_channel_connection(
+    channel_id: str,
+    tenant_context: TenantContext = Depends(get_tenant_context),
+    channel_service: ChannelService = Depends(get_channel_service),
+    health_service: HealthCheckService = Depends(get_health_service)
 ):
     """
-    测试Channel连接
+    测试渠道连接
     
-    手动触发指定Channel的连接测试。
+    手动触发指定渠道的连接测试。
     
     Args:
-        channel_id: Channel ID
+        channel_id: 渠道ID
         
     Returns:
-        dict: 测试结果
+        StandardResponse[Dict[str, Any]]: 测试结果
         
     Raises:
-        HTTPException 404: Channel不存在
+        HTTPException 404: 渠道不存在
     """
-    channel = channel_manager.get_channel(channel_id)
-    if not channel or channel.tenant_id != tenant_context.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Channel不存在"
+    try:
+        # 验证渠道存在且属于当前租户
+        channel = channel_service.get_channel(channel_id, tenant_context.tenant_id)
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="渠道不存在"
+            )
+        
+        # 执行健康检查
+        test_result = await health_service.check_channel_health(channel_id, force_check=True)
+        
+        return StandardResponse(
+            success=True,
+            data={
+                "channel_id": channel_id,
+                "channel_name": channel.name,
+                "test_result": test_result
+            },
+            message="渠道连接测试完成"
         )
-    
-    # 执行健康检查
-    await channel_manager._check_channel_health(channel_id)
-    
-    # 获取最新的指标
-    metrics = channel_manager.channel_metrics.get(channel_id)
-    
-    return {
-        "channel_id": channel_id,
-        "channel_name": channel.name,
-        "health_status": metrics.health_status if metrics else "unknown",
-        "response_time": metrics.response_time if metrics else 0,
-        "success_rate": metrics.success_rate if metrics else 0,
-        "test_time": channel_manager.channels[channel_id].updated_at
-    }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"测试渠道连接失败: {str(e)}"
+        )
