@@ -1,0 +1,79 @@
+# OpenAI供应商配置
+provider_id: "openai"
+name: "OpenAI"
+description: "OpenAI GPT系列模型"
+icon: "openai.png"
+
+# 支持的模型类型
+supported_model_types:
+  - "llm"
+
+# 凭证配置Schema
+credential_schema:
+  fields:
+    - name: "api_key"
+      type: "string"
+      required: true
+      sensitive: true
+      label: "API Key"
+      placeholder: "sk-..."
+      validation:
+        min_length: 20
+    - name: "base_url"
+      type: "string"
+      required: false
+      label: "Base URL"
+      placeholder: "https://api.openai.com/v1"
+      default: "https://api.openai.com/v1"
+    - name: "organization"
+      type: "string" 
+      required: false
+      label: "Organization ID"
+      placeholder: "org-..."
+
+# 支持的模型列表
+supported_models:
+  - model_id: "gpt-3.5-turbo"
+    name: "GPT-3.5 Turbo"
+    type: "llm"
+    max_tokens: 4096
+    pricing:
+      input: 0.0015  # per 1K tokens
+      output: 0.002
+  - model_id: "gpt-4"
+    name: "GPT-4"
+    type: "llm"
+    max_tokens: 8192
+    pricing:
+      input: 0.03
+      output: 0.06
+  - model_id: "gpt-4o"
+    name: "GPT-4o"
+    type: "llm" 
+    max_tokens: 128000
+    pricing:
+      input: 0.005
+      output: 0.015
+
+# 错误映射
+error_mapping:
+  connection_error:
+    - "openai.APIConnectionError"
+  authentication_error:
+    - "openai.AuthenticationError"
+  rate_limit_error:
+    - "openai.RateLimitError"
+  quota_exceeded_error:
+    - "openai.PermissionDeniedError"
+  model_not_found_error:
+    - "openai.NotFoundError"
+  bad_request_error:
+    - "openai.BadRequestError"
+  server_error:
+    - "openai.InternalServerError"
+
+# 默认配置
+defaults:
+  timeout: 30
+  max_retries: 3
+  retry_delay: 1

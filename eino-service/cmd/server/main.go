@@ -41,12 +41,12 @@ func main() {
 	}
 
 	logger.WithFields(logrus.Fields{
-		"port":            cfg.Server.Port,
-		"database_host":   cfg.Database.Host,
-		"database_port":   cfg.Database.Port,
-		"redis_host":      cfg.Redis.Host,
-		"redis_port":      cfg.Redis.Port,
-		"tenant_service":  cfg.Services.TenantService.BaseURL,
+		"port":           cfg.Server.Port,
+		"database_host":  cfg.Database.Host,
+		"database_port":  cfg.Database.Port,
+		"redis_host":     cfg.Redis.Host,
+		"redis_port":     cfg.Redis.Port,
+		"tenant_service": cfg.Services.TenantService.BaseURL,
 	}).Info("配置加载成功")
 
 	// 初始化Redis客户端
