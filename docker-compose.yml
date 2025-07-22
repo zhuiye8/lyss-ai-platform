@@ -15,7 +15,10 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./sql/00-extensions.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+      - ./sql/01-init-base.sql:/docker-entrypoint-initdb.d/01-init-base.sql:ro
+      - ./sql/02-auth-service.sql:/docker-entrypoint-initdb.d/02-auth-service.sql:ro
+      - ./sql/03-provider-service.sql:/docker-entrypoint-initdb.d/03-provider-service.sql:ro
     command:
       - "postgres"
       - "-c"

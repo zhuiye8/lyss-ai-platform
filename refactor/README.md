@@ -183,20 +183,23 @@ refactor/
 
 ## 🎯 核心决策总结
 
-### **架构决策**
-- **完全重新设计** - 不考虑历史数据兼容性
-- **7个独立微服务** - 职责清晰，易于维护
-- **生产就绪标准** - 所有组件按生产环境设计
+### **架构决策 (2025-01-22 更新)**
+- **统一数据库架构** - 单个PostgreSQL实例，所有服务共享
+- **SQL文件集中管理** - 统一存放在`/sql/`目录，按序号执行
+- **服务命名统一** - 短横线格式：`auth-service/`, `provider-service/`等
+- **混合部署模式** - 数据库在Docker，微服务本地启动
 
 ### **技术方案**
-- **确定技术**: One-API机制、微服务架构、Docker部署
-- **待调研技术**: EINO框架、Mem0AI集成 🔍
-- **前端方案**: React 18 + TypeScript + Ant Design X
+- **数据库**: 统一PostgreSQL + Redis + Qdrant（Docker部署）
+- **微服务**: FastAPI + Go本地启动，通过Docker数据库连接
+- **前端**: React 18 + TypeScript + Ant Design X（本地启动）
+- **已完成技术**: Provider Service、Auth Service、User Service
 
 ### **开发规范**
-- **命名规范**: lyss-{service-name}统一格式
-- **项目结构**: Python/Go/React标准化模板
-- **编码规范**: 中文注释、严格类型检查
+- **数据库架构**: 表前缀隔离（`auth_*`, `provider_*`等）
+- **SQL管理**: `/sql/00-extensions.sql`, `01-init-base.sql`等顺序执行
+- **服务命名**: 短横线格式，文档与目录名一致
+- **部署方式**: 只有基础设施用Docker，业务服务本地启动
 
 ---
 

@@ -1,0 +1,347 @@
+# ================================================================
+# Lyss Provider Service - Docker Compose配置
+# 
+# 用于本地开发和测试环境的完整服务编排
+# 包含Provider Service及其所有依赖服务
+#
+# 使用方法:
+#   docker-compose up -d          # 启动所有服务
+#   docker-compose up provider    # 只启动Provider服务
+#   docker-compose logs -f provider  # 查看日志
+#
+# Author: Lyss AI Team
+# Created: 2025-01-22
+# Modified: 2025-01-22
+# ================================================================
+
+version: '3.8'
+
+# ================================================================
+# 网络配置
+# ================================================================
+networks:
+  lyss-network:
+    name: lyss-platform
+    external: true
+    driver: bridge
+
+# ================================================================
+# 数据卷配置
+# ================================================================
+volumes:
+  postgres_data:
+    name: lyss-postgres-data
+    external: true
+  redis_data:
+    name: lyss-redis-data
+    external: true
+  provider_logs:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./logs
+
+# ================================================================
+# 服务定义
+# ================================================================
+services:
+
+  # ================================================================
+  # Provider Service - 主服务
+  # ================================================================
+  provider:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # 开发环境目标
+    image: lyss/provider-service:latest
+    container_name: lyss-provider-service
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "8003:8003"    # 主服务端口
+      - "9090:9090"    # Prometheus指标端口
+    
+    # 环境变量
+    environment:
+      # 基础配置
+      - ENVIRONMENT=development
+      - SERVICE_NAME=lyss-provider-service
+      - HOST=0.0.0.0
+      - PORT=8003
+      - DEBUG=true
+      
+      # 数据库配置 (连接到外部PostgreSQL)
+      - DATABASE_URL=postgresql://lyss_user:lyss123@postgres:5432/lyss_db
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=lyss_user
+      - DATABASE_PASSWORD=lyss123
+      - DATABASE_NAME=lyss_db
+      
+      # Redis配置 (连接到外部Redis)
+      - REDIS_URL=redis://redis:6379/2
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=2
+      - REDIS_KEY_PREFIX=lyss:provider:
+      
+      # JWT配置
+      - JWT_SECRET_KEY=dev-jwt-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=1440
+      
+      # 加密配置
+      - ENCRYPTION_KEY=dev-32-byte-encryption-key-change
+      - ENCRYPTION_ALGORITHM=AES-256-GCM
+      
+      # CORS配置
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+      - CORS_ALLOW_CREDENTIALS=true
+      
+      # 速率限制
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+      - RATE_LIMIT_USER_REQUESTS_PER_MINUTE=200
+      
+      # 日志配置
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - LOG_FILE_ENABLED=true
+      - LOG_FILE_PATH=/app/logs/provider-service.log
+      
+      # Provider配置
+      - DEFAULT_REQUEST_TIMEOUT=30
+      - HEALTH_CHECK_INTERVAL=300
+      - LOAD_BALANCER_ALGORITHM=weighted_random
+      
+      # 配额配置
+      - DEFAULT_DAILY_REQUEST_LIMIT=10000
+      - DEFAULT_DAILY_TOKEN_LIMIT=1000000
+      
+      # 监控配置
+      - METRICS_ENABLED=true
+      - METRICS_PATH=/metrics
+      - METRICS_PORT=9090
+    
+    # 数据卷挂载
+    volumes:
+      - provider_logs:/app/logs
+      - ./config:/app/config:ro  # 配置文件只读挂载
+    
+    # 网络配置
+    networks:
+      - lyss-network
+    
+    # 依赖服务
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 启动命令
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
+    
+    # 开发环境特定配置
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # ================================================================
+  # PostgreSQL数据库 (如果不使用外部数据库)
+  # ================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: lyss-postgres
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "5433:5432"
+    
+    # 环境变量
+    environment:
+      - POSTGRES_DB=lyss_db
+      - POSTGRES_USER=lyss_user
+      - POSTGRES_PASSWORD=lyss123
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    
+    # 数据卷
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+      - ./sql:/docker-entrypoint-initdb.d:ro  # 初始化SQL脚本
+    
+    # 网络
+    networks:
+      - lyss-network
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lyss_user -d lyss_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # ================================================================
+  # Redis缓存 (如果不使用外部Redis)
+  # ================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: lyss-redis
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "6380:6379"
+    
+    # 启动命令
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    
+    # 数据卷
+    volumes:
+      - redis_data:/data
+    
+    # 网络
+    networks:
+      - lyss-network
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # ================================================================
+  # Prometheus监控 (可选)
+  # ================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lyss-prometheus
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "9091:9090"
+    
+    # 配置文件
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    
+    # 网络
+    networks:
+      - lyss-network
+    
+    # 启动命令
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    
+    # 依赖服务
+    depends_on:
+      - provider
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ================================================================
+  # Grafana仪表板 (可选)
+  # ================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lyss-grafana
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "3001:3000"
+    
+    # 环境变量
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    
+    # 数据卷
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    
+    # 网络
+    networks:
+      - lyss-network
+    
+    # 依赖服务
+    depends_on:
+      - prometheus
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+# ================================================================
+# 额外的数据卷定义
+# ================================================================
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ================================================================
+# 开发环境覆盖配置
+# ================================================================
+# 使用: docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+
+# 开发环境可以创建 docker-compose.override.yml 文件来覆盖配置:
+# version: '3.8'
+# services:
+#   provider:
+#     volumes:
+#       - .:/app  # 挂载代码目录用于热重载
+#       - /app/venv  # 排除虚拟环境目录
+#     environment:
+#       - DEBUG=true
+#       - LOG_LEVEL=DEBUG

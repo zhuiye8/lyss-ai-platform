@@ -1,8 +1,36 @@
-# 数据库架构设计 (2025-01-21 重构版)
+# 数据库架构设计 (2025-01-22 统一架构版)
 
 ## 📋 文档概述
 
 基于深度调研Dify等成熟AI平台和Provider Service成功实践，采用**统一数据库架构**，支持生产级多租户隔离。
+
+## 🚨 重要架构变更 (2025-01-22)
+
+**SQL文件已统一集中管理，不再分散在各服务目录中！**
+
+### **SQL文件组织结构**
+```
+/sql/                           # 统一SQL文件目录
+├── 00-extensions.sql          # PostgreSQL扩展和基础配置
+├── 01-init-base.sql          # 基础表（roles, tenants, users）
+├── 02-auth-service.sql       # 认证服务表（auth_*前缀）
+├── 03-provider-service.sql   # 供应商服务表（provider_*前缀）
+├── 04-chat-service.sql       # 对话服务表（chat_*前缀）待创建
+├── 05-memory-service.sql     # 记忆服务表（memory_*前缀）待创建
+└── seeds/                    # 测试数据
+    ├── 01-base-data.sql
+    └── 02-provider-data.sql
+```
+
+### **Docker自动初始化**
+```yaml
+# docker-compose.yml中的配置
+volumes:
+  - ./sql/00-extensions.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+  - ./sql/01-init-base.sql:/docker-entrypoint-initdb.d/01-init-base.sql:ro  
+  - ./sql/02-auth-service.sql:/docker-entrypoint-initdb.d/02-auth-service.sql:ro
+  - ./sql/03-provider-service.sql:/docker-entrypoint-initdb.d/03-provider-service.sql:ro
+```
 
 ---
 
