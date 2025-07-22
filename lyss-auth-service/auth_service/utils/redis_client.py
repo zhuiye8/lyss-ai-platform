@@ -363,3 +363,8 @@ class TokenBlacklist:
 redis_client = RedisClient()
 rate_limiter = RateLimiter(redis_client)
 token_blacklist = TokenBlacklist(redis_client)
+
+
+def get_redis_client() -> RedisClient:
+    """获取Redis客户端实例（用于依赖注入）"""
+    return redis_client

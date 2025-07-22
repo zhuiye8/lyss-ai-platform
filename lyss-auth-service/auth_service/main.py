@@ -12,7 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .middleware.error_handler import ErrorHandlerMiddleware
 from .middleware.request_logging import RequestLoggingMiddleware
-from .routers import health, auth, tokens, internal
+from .middleware.auth_middleware import AuthenticationMiddleware, SecurityHeadersMiddleware
+from .middleware.rate_limit_middleware import RateLimitMiddleware
+from .middleware.monitoring_middleware import MonitoringMiddleware
+from .routers import health, auth, auth_v2, oauth2, mfa, security_policy, tokens, internal
 from .utils.redis_client import redis_client
 from .utils.logging import logger
 
@@ -96,8 +99,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 添加自定义中间件
+# 添加自定义中间件（注意顺序很重要）
+# 1. 监控中间件 - 最外层，记录所有请求
+app.add_middleware(MonitoringMiddleware)
+
+# 2. 安全头中间件 - 添加安全相关HTTP头
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. 限流中间件 - 在认证之前进行限流
+app.add_middleware(RateLimitMiddleware)
+
+# 4. 认证中间件 - 处理JWT令牌验证和用户上下文注入
+app.add_middleware(AuthenticationMiddleware, require_auth_by_default=False)
+
+# 5. 错误处理中间件 - 统一错误处理和响应格式
 app.add_middleware(ErrorHandlerMiddleware)
+
+# 6. 请求日志中间件 - 最内层，记录详细的请求日志
 app.add_middleware(RequestLoggingMiddleware)
 
 # 注册路由
@@ -106,10 +124,35 @@ app.include_router(
     tags=["健康检查"],
 )
 
+# 原版本认证路由（OAuth2标准）
 app.include_router(
     auth.router,
     prefix="/api/v1/auth",
-    tags=["用户认证"],
+    tags=["用户认证（标准版）"],
+)
+
+# 增强版认证路由（企业级功能）
+app.include_router(
+    auth_v2.router,
+    tags=["认证授权（增强版）"],
+)
+
+# OAuth2联邦认证路由
+app.include_router(
+    oauth2.router,
+    tags=["OAuth2联邦认证"],
+)
+
+# MFA多因素认证路由
+app.include_router(
+    mfa.router,
+    tags=["多因素认证"],
+)
+
+# 安全策略管理路由
+app.include_router(
+    security_policy.router,
+    tags=["安全策略管理"],
 )
 
 app.include_router(

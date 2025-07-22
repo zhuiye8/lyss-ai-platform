@@ -1,56 +1,152 @@
-# 数据库架构设计
+# 数据库架构设计 (2025-01-21 重构版)
 
 ## 📋 文档概述
 
-重新设计的数据库架构，采用服务独立数据库模式，支持生产级多租户隔离。
+基于深度调研Dify等成熟AI平台和Provider Service成功实践，采用**统一数据库架构**，支持生产级多租户隔离。
 
 ---
 
-## 🗄️ 数据库分布方案
+## 🗄️ 数据库架构方案
 
 ### **核心设计原则**
-- **服务独立数据库** - 每个服务拥有独立的数据库
-- **数据一致性** - 通过API调用保证跨服务数据一致性
-- **多租户设计** - 在数据库级别和表级别双重隔离
+- **统一数据库架构** - 所有微服务共享同一PostgreSQL数据库实例
+- **表级多租户隔离** - 通过tenant_id实现数据隔离，支持Row Level Security  
+- **服务模块化** - 每个服务拥有独立的表命名空间，便于管理和扩展
+- **ACID事务保障** - 避免分布式事务复杂性，确保数据一致性
 
-### **数据库分布**
+### **架构决策依据**
+1. **Dify案例验证** - 成熟AI平台使用统一数据库+多租户设计
+2. **Provider Service成功** - 已完成的Provider Service验证了此架构的可行性  
+3. **简化运维** - 统一数据库降低部署复杂度和维护成本
+4. **数据一致性** - 避免跨服务数据同步问题，支持复杂业务事务
+
+### **数据库结构**
 ```sql
--- 1. lyss_user_db - 用户服务数据库
-CREATE DATABASE lyss_user_db;
-
--- 2. lyss_provider_db - 供应商服务数据库  
-CREATE DATABASE lyss_provider_db;
-
--- 3. lyss_chat_db - 对话服务数据库
-CREATE DATABASE lyss_chat_db;
-
--- 4. lyss_memory_db - 记忆服务数据库
-CREATE DATABASE lyss_memory_db;
-
--- 5. lyss_shared_db - 共享配置数据库（角色权限等）
-CREATE DATABASE lyss_shared_db;
+-- 统一数据库：lyss_db
+-- 各服务通过表前缀区分：
+-- - auth_* : 认证服务表
+-- - provider_* : 供应商服务表  
+-- - chat_* : 对话服务表
+-- - memory_* : 记忆服务表
+-- - tenant_* : 租户管理表
 ```
 
 ---
 
-## 👥 用户服务数据库 (lyss_user_db)
+## 🔐 认证服务表结构 (auth_*)
 
-### **租户表**
+### **用户表**
 ```sql
-CREATE TABLE tenants (
+CREATE TABLE auth_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
-    slug VARCHAR(50) UNIQUE NOT NULL,  -- 租户标识符
-    status VARCHAR(20) DEFAULT 'active',  -- active, suspended, deleted
-    plan_type VARCHAR(20) DEFAULT 'basic',  -- basic, pro, enterprise
-    max_users INTEGER DEFAULT 100,
-    max_api_calls INTEGER DEFAULT 10000,
+    tenant_id UUID NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    username VARCHAR(100),
+    hashed_password VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100), 
+    role_id UUID NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    email_verified BOOLEAN DEFAULT FALSE,
+    last_login_at TIMESTAMP,
+    login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP,
+    mfa_enabled BOOLEAN DEFAULT FALSE,
+    mfa_secret VARCHAR(255), -- TOTP密钥，加密存储
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- 多租户唯一约束
+    CONSTRAINT uk_auth_users_tenant_email UNIQUE(tenant_id, email),
+    CONSTRAINT uk_auth_users_tenant_username UNIQUE(tenant_id, username)
+);
+
+CREATE INDEX idx_auth_users_tenant_id ON auth_users(tenant_id);
+CREATE INDEX idx_auth_users_email ON auth_users(email);
+CREATE INDEX idx_auth_users_role_id ON auth_users(role_id);
+CREATE INDEX idx_auth_users_active ON auth_users(is_active);
+```
+
+### **用户会话表**
+```sql  
+CREATE TABLE auth_user_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
+    session_token VARCHAR(255) NOT NULL UNIQUE,
+    refresh_token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    refresh_expires_at TIMESTAMP NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_auth_sessions_user_id ON auth_user_sessions(user_id);
+CREATE INDEX idx_auth_sessions_token ON auth_user_sessions(session_token);  
+CREATE INDEX idx_auth_sessions_active ON auth_user_sessions(is_active);
+CREATE INDEX idx_auth_sessions_expires ON auth_user_sessions(expires_at);
+```
+
+### **OAuth2集成表**
+```sql
+CREATE TABLE auth_oauth_providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    provider_name VARCHAR(50) NOT NULL, -- google, github, microsoft
+    client_id VARCHAR(255) NOT NULL,
+    encrypted_client_secret TEXT NOT NULL, -- pgcrypto加密
+    redirect_uri VARCHAR(500) NOT NULL,
+    scopes TEXT[] DEFAULT ARRAY['openid', 'profile', 'email'],
+    is_enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    CONSTRAINT uk_auth_oauth_tenant_provider UNIQUE(tenant_id, provider_name)
+);
+
+CREATE TABLE auth_oauth_connections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    provider_id UUID NOT NULL,
+    external_id VARCHAR(255) NOT NULL,
+    external_email VARCHAR(255),
+    external_username VARCHAR(255),
+    access_token TEXT, -- 加密存储
+    refresh_token TEXT, -- 加密存储  
+    token_expires_at TIMESTAMP,
+    last_used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    CONSTRAINT fk_auth_oauth_user FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_auth_oauth_provider FOREIGN KEY (provider_id) REFERENCES auth_oauth_providers(id) ON DELETE CASCADE,
+    CONSTRAINT uk_auth_oauth_provider_external UNIQUE(provider_id, external_id)
+);
+```
+
+---
+
+## 👥 租户管理表结构 (tenant_*)
+
+### **租户表** 
+```sql
+CREATE TABLE tenant_organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
+    subscription_plan VARCHAR(50) DEFAULT 'basic',
+    max_users INTEGER DEFAULT 10,
+    settings JSONB DEFAULT '{}',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_tenants_slug ON tenants(slug);
-CREATE INDEX idx_tenants_status ON tenants(status);
+CREATE INDEX idx_tenant_orgs_slug ON tenant_organizations(slug);
+CREATE INDEX idx_tenant_orgs_status ON tenant_organizations(status);
 ```
 
 ### **用户表**

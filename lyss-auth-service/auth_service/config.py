@@ -9,7 +9,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-class AuthServiceSettings(BaseSettings):
+class Settings(BaseSettings):
     """Auth Service 配置类"""
 
     # =================================
@@ -37,6 +37,27 @@ class AuthServiceSettings(BaseSettings):
     )
     jwt_issuer: str = Field(default="lyss-auth-service", description="JWT签发者")
     jwt_audience: str = Field(default="lyss-platform", description="JWT受众")
+
+    # =================================
+    # 🔗 OAuth2 联邦认证配置  
+    # =================================
+    auth_service_base_url: str = Field(
+        default="http://localhost:8001", 
+        description="认证服务基础URL（用于OAuth2回调）"
+    )
+    
+    # Google OAuth2
+    google_client_id: str = Field(default="", description="Google OAuth2客户端ID")
+    google_client_secret: str = Field(default="", description="Google OAuth2客户端密钥")
+    
+    # GitHub OAuth2  
+    github_client_id: str = Field(default="", description="GitHub OAuth2客户端ID")
+    github_client_secret: str = Field(default="", description="GitHub OAuth2客户端密钥")
+    
+    # Microsoft OAuth2
+    microsoft_client_id: str = Field(default="", description="Microsoft OAuth2客户端ID")
+    microsoft_client_secret: str = Field(default="", description="Microsoft OAuth2客户端密钥")
+    microsoft_tenant_id: str = Field(default="common", description="Microsoft租户ID")
 
     # =================================
     # 🗄️ Redis 缓存配置
@@ -141,7 +162,12 @@ class AuthServiceSettings(BaseSettings):
 
 
 # 全局配置实例
-settings = AuthServiceSettings()
+settings = Settings()
+
+
+def get_settings() -> Settings:
+    """获取配置实例（用于依赖注入）"""
+    return settings
 
 # 验证生产环境配置
 if settings.is_production():

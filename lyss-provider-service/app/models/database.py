@@ -45,17 +45,17 @@ class ProviderConfigTable(Base):
 
 
 class ChannelTable(Base):
-    """Channel配置表"""
-    __tablename__ = "channels"
+    """Provider Channel配置表（符合统一数据库规范）"""
+    __tablename__ = "provider_channels"
     
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(String(36), nullable=False, index=True, comment="租户ID")
+    id = Column(String(36), primary_key=True, index=True, comment="Channel UUID")
+    tenant_id = Column(String(36), nullable=False, index=True, comment="租户UUID")
     name = Column(String(100), nullable=False, comment="Channel名称")
     provider_id = Column(String(50), nullable=False, comment="供应商ID")
     base_url = Column(String(500), nullable=False, comment="API基础URL")
-    credentials = Column(Text, nullable=False, comment="加密后的凭证信息")
+    credentials = Column(Text, nullable=False, comment="pgcrypto加密后的凭证信息")
     models = Column(JSON, nullable=False, comment="支持的模型列表")
-    status = Column(String(20), default="active", comment="状态：active/disabled")
+    status = Column(String(20), default="active", comment="状态：active/inactive/disabled")
     priority = Column(Integer, default=1, comment="优先级（数字越小优先级越高）")
     weight = Column(Integer, default=100, comment="负载均衡权重")
     max_requests_per_minute = Column(Integer, default=1000, comment="每分钟最大请求数")
@@ -64,21 +64,22 @@ class ChannelTable(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     
     __table_args__ = (
-        Index('idx_channel_tenant', 'tenant_id'),
-        Index('idx_channel_provider', 'provider_id'),
-        Index('idx_channel_status', 'status'),
-        Index('idx_channel_priority', 'priority'),
-        {'comment': 'Channel配置表'}
+        Index('idx_provider_channels_tenant_id', 'tenant_id'),
+        Index('idx_provider_channels_provider_id', 'provider_id'),
+        Index('idx_provider_channels_status', 'status'),
+        Index('idx_provider_channels_priority', 'priority'),
+        Index('idx_provider_channels_tenant_provider', 'tenant_id', 'provider_id'),
+        {'comment': 'Provider Channel配置表（多租户隔离）'}
     )
 
 
 class RequestLogTable(Base):
-    """请求日志表"""
-    __tablename__ = "request_logs"
+    """Provider请求日志表（符合统一数据库规范）"""
+    __tablename__ = "provider_request_logs"
     
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(String(36), nullable=False, index=True, comment="租户ID")
-    channel_id = Column(Integer, nullable=False, comment="使用的Channel ID")
+    id = Column(String(36), primary_key=True, index=True, comment="日志记录UUID")
+    tenant_id = Column(String(36), nullable=False, index=True, comment="租户UUID")
+    channel_id = Column(String(36), nullable=False, comment="使用的Channel UUID")
     provider_id = Column(String(50), nullable=False, comment="供应商ID")
     model = Column(String(100), nullable=False, comment="使用的模型")
     request_id = Column(String(100), nullable=True, comment="请求追踪ID")
@@ -90,14 +91,16 @@ class RequestLogTable(Base):
     completion_tokens = Column(Integer, default=0, comment="输出token数")
     total_tokens = Column(Integer, default=0, comment="总token数")
     is_stream = Column(Boolean, default=False, comment="是否流式请求")
+    client_ip = Column(String(45), nullable=True, comment="客户端IP地址")
+    user_agent = Column(Text, nullable=True, comment="客户端User-Agent")
     error_message = Column(Text, nullable=True, comment="错误信息")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     
     __table_args__ = (
-        Index('idx_request_tenant', 'tenant_id'),
-        Index('idx_request_channel', 'channel_id'),
-        Index('idx_request_provider', 'provider_id'),
-        Index('idx_request_model', 'model'),
+        Index('idx_provider_request_logs_tenant_created', 'tenant_id', 'created_at'),
+        Index('idx_provider_request_logs_channel_created', 'channel_id', 'created_at'),
+        Index('idx_provider_request_logs_provider_created', 'provider_id', 'created_at'),
+        Index('idx_provider_request_logs_model', 'model'),
         Index('idx_request_created', 'created_at'),
         Index('idx_request_status', 'status_code'),
         {'comment': '请求日志表'}
@@ -105,50 +108,58 @@ class RequestLogTable(Base):
 
 
 class ChannelMetricsTable(Base):
-    """Channel指标统计表"""
-    __tablename__ = "channel_metrics"
+    """Provider Channel指标统计表（符合统一数据库规范）"""
+    __tablename__ = "provider_channel_metrics"
     
-    id = Column(Integer, primary_key=True, index=True)
-    channel_id = Column(Integer, unique=True, nullable=False, index=True, comment="Channel ID")
+    id = Column(String(36), primary_key=True, index=True, comment="指标记录UUID")
+    channel_id = Column(String(36), unique=True, nullable=False, index=True, comment="Channel UUID")
     total_requests = Column(Integer, default=0, comment="总请求数")
     successful_requests = Column(Integer, default=0, comment="成功请求数")
     failed_requests = Column(Integer, default=0, comment="失败请求数")
     total_tokens = Column(Integer, default=0, comment="总token使用量")
     avg_response_time = Column(Float, default=0.0, comment="平均响应时间")
     success_rate = Column(Float, default=0.0, comment="成功率")
+    requests_per_minute = Column(Float, default=0.0, comment="每分钟请求数")
     last_request_time = Column(DateTime, nullable=True, comment="最后请求时间")
     last_success_time = Column(DateTime, nullable=True, comment="最后成功时间")
     last_error_time = Column(DateTime, nullable=True, comment="最后错误时间")
     health_status = Column(String(20), default="unknown", comment="健康状态")
     health_check_time = Column(DateTime, nullable=True, comment="最后健康检查时间")
+    consecutive_failures = Column(Integer, default=0, comment="连续失败次数")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     
     __table_args__ = (
-        Index('idx_metrics_channel', 'channel_id'),
-        Index('idx_metrics_health', 'health_status'),
-        Index('idx_metrics_updated', 'updated_at'),
-        {'comment': 'Channel指标统计表'}
+        Index('idx_provider_metrics_channel', 'channel_id'),
+        Index('idx_provider_metrics_health', 'health_status'),
+        Index('idx_provider_metrics_updated', 'updated_at'),
+        Index('idx_provider_metrics_success_rate', 'success_rate'),
+        {'comment': 'Provider Channel指标统计表'}
     )
 
 
 class TenantQuotaTable(Base):
-    """租户配额管理表"""
-    __tablename__ = "tenant_quotas"
+    """Provider租户配额管理表（符合统一数据库规范）"""
+    __tablename__ = "provider_tenant_quotas"
     
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(String(36), unique=True, nullable=False, index=True, comment="租户ID")
+    id = Column(String(36), primary_key=True, index=True, comment="配额记录UUID")
+    tenant_id = Column(String(36), unique=True, nullable=False, index=True, comment="租户UUID")
     daily_request_limit = Column(Integer, default=10000, comment="每日请求限制")
     daily_token_limit = Column(Integer, default=1000000, comment="每日token限制")
     daily_requests_used = Column(Integer, default=0, comment="每日已使用请求数")
     daily_tokens_used = Column(Integer, default=0, comment="每日已使用token数")
-    reset_date = Column(DateTime, default=func.now(), comment="配额重置日期")
+    monthly_request_limit = Column(Integer, default=300000, comment="每月请求限制")
+    monthly_token_limit = Column(Integer, default=30000000, comment="每月token限制")
+    monthly_requests_used = Column(Integer, default=0, comment="每月已使用请求数")
+    monthly_tokens_used = Column(Integer, default=0, comment="每月已使用token数")
+    reset_date = Column(DateTime, default=func.now(), comment="每日配额重置日期")
+    monthly_reset_date = Column(DateTime, default=func.now(), comment="每月配额重置日期")
     status = Column(String(20), default="active", comment="状态：active/suspended/disabled")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     
     __table_args__ = (
-        Index('idx_quota_tenant', 'tenant_id'),
+        Index('idx_provider_quotas_tenant', 'tenant_id'),
         Index('idx_quota_status', 'status'),
         Index('idx_quota_reset', 'reset_date'),
         {'comment': '租户配额管理表'}
