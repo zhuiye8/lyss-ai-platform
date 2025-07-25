@@ -436,21 +436,72 @@ class UserProfileAnalyzer:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """获取活动统计（占位符方法）"""
-        # 这里应该从user_activities表获取数据
-        # 暂时返回模拟数据
-        return {
-            "total_activities": 45,
-            "active_days": 18,
-            "avg_activities_per_day": 2.5,
-            "last_activity": datetime.utcnow().isoformat(),
-            "activity_types": {
-                "chat_message": 30,
-                "login": 18,
-                "feature_usage": 15,
-                "model_usage": 12
+        """获取活动统计"""
+        try:
+            from ..models.database.activity import UserActivity
+            
+            # 基础活动统计查询
+            basic_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            # 总活动数
+            total_query = select(func.count(UserActivity.id)).where(
+                and_(*basic_conditions)
+            )
+            total_result = await db.execute(total_query)
+            total_activities = total_result.scalar() or 0
+            
+            # 活跃天数
+            active_days_query = select(
+                func.count(func.distinct(func.date(UserActivity.created_at)))
+            ).where(and_(*basic_conditions))
+            active_days_result = await db.execute(active_days_query)
+            active_days = active_days_result.scalar() or 0
+            
+            # 最后活动时间
+            last_activity_query = select(
+                func.max(UserActivity.created_at)
+            ).where(and_(*basic_conditions))
+            last_activity_result = await db.execute(last_activity_query)
+            last_activity = last_activity_result.scalar()
+            
+            # 活动类型分布
+            activity_types_query = select(
+                UserActivity.activity_type,
+                func.count(UserActivity.id).label('count')
+            ).where(and_(*basic_conditions)).group_by(UserActivity.activity_type)
+            
+            activity_types_result = await db.execute(activity_types_query)
+            activity_types = {
+                row.activity_type: row.count 
+                for row in activity_types_result
             }
-        }
+            
+            # 计算平均每日活动
+            avg_activities_per_day = (
+                total_activities / max(active_days, 1) if active_days > 0 else 0
+            )
+            
+            return {
+                "total_activities": total_activities,
+                "active_days": active_days,
+                "avg_activities_per_day": round(avg_activities_per_day, 2),
+                "last_activity": last_activity.isoformat() if last_activity else None,
+                "activity_types": activity_types
+            }
+            
+        except Exception as e:
+            logger.error(f"获取活动统计失败 [{user_id}]: {e}")
+            # 返回默认数据以保证分析能够继续
+            return {
+                "total_activities": 0,
+                "active_days": 0,
+                "avg_activities_per_day": 0.0,
+                "last_activity": None,
+                "activity_types": {}
+            }
     
     async def _analyze_model_usage(
         self,
@@ -458,18 +509,80 @@ class UserProfileAnalyzer:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """分析模型使用情况（占位符方法）"""
-        # 这里应该从活动表分析模型使用
-        return {
-            "favorite_models": ["gpt-4", "claude-3", "deepseek"],
-            "model_distribution": {
-                "gpt-4": {"count": 20, "percentage": 45.5},
-                "claude-3": {"count": 15, "percentage": 34.1},
-                "deepseek": {"count": 9, "percentage": 20.4}
-            },
-            "total_model_calls": 44,
-            "unique_models_used": 3
-        }
+        """分析模型使用情况"""
+        try:
+            from ..models.database.activity import UserActivity
+            
+            # 查询模型使用活动
+            model_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date,
+                UserActivity.activity_type.in_(['model_usage', 'chat_message'])
+            ]
+            
+            model_query = select(UserActivity).where(and_(*model_conditions))
+            result = await db.execute(model_query)
+            activities = result.scalars().all()
+            
+            if not activities:
+                return {
+                    "favorite_models": [],
+                    "model_distribution": {},
+                    "total_model_calls": 0,
+                    "unique_models_used": 0
+                }
+            
+            # 解析模型使用数据
+            model_counts = {}
+            total_calls = 0
+            
+            for activity in activities:
+                metadata = activity.metadata or {}
+                model = metadata.get('model')
+                
+                if model:
+                    model_counts[model] = model_counts.get(model, 0) + 1
+                    total_calls += 1
+            
+            if not model_counts:
+                return {
+                    "favorite_models": [],
+                    "model_distribution": {},
+                    "total_model_calls": 0,
+                    "unique_models_used": 0
+                }
+            
+            # 计算分布百分比
+            model_distribution = {}
+            for model, count in model_counts.items():
+                percentage = (count / total_calls) * 100
+                model_distribution[model] = {
+                    "count": count,
+                    "percentage": round(percentage, 1)
+                }
+            
+            # 按使用频率排序获取偏好模型
+            favorite_models = sorted(
+                model_counts.keys(), 
+                key=lambda x: model_counts[x], 
+                reverse=True
+            )
+            
+            return {
+                "favorite_models": favorite_models,
+                "model_distribution": model_distribution,
+                "total_model_calls": total_calls,
+                "unique_models_used": len(model_counts)
+            }
+            
+        except Exception as e:
+            logger.error(f"分析模型使用失败 [{user_id}]: {e}")
+            return {
+                "favorite_models": [],
+                "model_distribution": {},
+                "total_model_calls": 0,
+                "unique_models_used": 0
+            }
     
     async def _analyze_conversation_patterns(
         self,
@@ -477,21 +590,102 @@ class UserProfileAnalyzer:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """分析对话模式（占位符方法）"""
-        return {
-            "avg_messages_per_conversation": 8.5,
-            "conversation_length_distribution": {
-                "short": 12,    # 1-5条消息
-                "medium": 18,   # 6-20条消息  
-                "long": 4       # 21+条消息
-            },
-            "popular_topics": {
-                "技术问题": 15,
-                "代码调试": 12,
-                "产品咨询": 8
-            },
-            "peak_conversation_hours": [9, 14, 20]
-        }
+        """分析对话模式"""
+        try:
+            from ..models.database.activity import UserActivity
+            
+            # 查询聊天消息活动
+            chat_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date,
+                UserActivity.activity_type == 'chat_message'
+            ]
+            
+            chat_query = select(UserActivity).where(and_(*chat_conditions))
+            result = await db.execute(chat_query)
+            chat_activities = result.scalars().all()
+            
+            if not chat_activities:
+                return {
+                    "avg_messages_per_conversation": 0,
+                    "conversation_length_distribution": {
+                        "short": 0, "medium": 0, "long": 0
+                    },
+                    "popular_topics": {},
+                    "peak_conversation_hours": []
+                }
+            
+            # 按对话ID分组统计
+            conversation_data = {}
+            hour_activity = {}
+            topic_counts = {}
+            
+            for activity in chat_activities:
+                metadata = activity.metadata or {}
+                conversation_id = metadata.get('conversation_id')
+                
+                # 对话长度统计
+                if conversation_id:
+                    if conversation_id not in conversation_data:
+                        conversation_data[conversation_id] = 0
+                    conversation_data[conversation_id] += 1
+                
+                # 活跃时段统计
+                hour = activity.created_at.hour
+                hour_activity[hour] = hour_activity.get(hour, 0) + 1
+                
+                # 主题分析（基于消息长度简单分类）
+                message_length = metadata.get('message_length', 0)
+                if message_length > 200:
+                    topic = "深度讨论"
+                elif message_length > 50:
+                    topic = "常规对话"
+                else:
+                    topic = "简单问答"
+                
+                topic_counts[topic] = topic_counts.get(topic, 0) + 1
+            
+            # 计算平均消息数
+            if conversation_data:
+                total_messages = sum(conversation_data.values())
+                avg_messages = total_messages / len(conversation_data)
+            else:
+                avg_messages = 0
+            
+            # 对话长度分布
+            length_dist = {"short": 0, "medium": 0, "long": 0}
+            for conv_id, msg_count in conversation_data.items():
+                if msg_count <= 5:
+                    length_dist["short"] += 1
+                elif msg_count <= 20:
+                    length_dist["medium"] += 1
+                else:
+                    length_dist["long"] += 1
+            
+            # 获取活跃时段（前3个最活跃的小时）
+            peak_hours = sorted(
+                hour_activity.keys(),
+                key=lambda h: hour_activity[h],
+                reverse=True
+            )[:3]
+            
+            return {
+                "avg_messages_per_conversation": round(avg_messages, 1),
+                "conversation_length_distribution": length_dist,
+                "popular_topics": topic_counts,
+                "peak_conversation_hours": peak_hours
+            }
+            
+        except Exception as e:
+            logger.error(f"分析对话模式失败 [{user_id}]: {e}")
+            return {
+                "avg_messages_per_conversation": 0,
+                "conversation_length_distribution": {
+                    "short": 0, "medium": 0, "long": 0
+                },
+                "popular_topics": {},
+                "peak_conversation_hours": []
+            }
     
     async def _analyze_active_hours(
         self,
@@ -499,13 +693,48 @@ class UserProfileAnalyzer:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, int]:
-        """分析活跃时段（占位符方法）"""
-        return {
-            "morning": 15,    # 6-12点
-            "afternoon": 20,  # 12-18点  
-            "evening": 18,    # 18-24点
-            "night": 2        # 0-6点
-        }
+        """分析活跃时段"""
+        try:
+            from ..models.database.activity import UserActivity
+            
+            # 查询所有活动记录
+            activity_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            activity_query = select(UserActivity).where(and_(*activity_conditions))
+            result = await db.execute(activity_query)
+            activities = result.scalars().all()
+            
+            if not activities:
+                return {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
+            
+            # 按时段统计活动
+            time_periods = {
+                "morning": 0,   # 6-12点
+                "afternoon": 0, # 12-18点
+                "evening": 0,   # 18-24点
+                "night": 0      # 0-6点
+            }
+            
+            for activity in activities:
+                hour = activity.created_at.hour
+                
+                if 6 <= hour < 12:
+                    time_periods["morning"] += 1
+                elif 12 <= hour < 18:
+                    time_periods["afternoon"] += 1
+                elif 18 <= hour < 24:
+                    time_periods["evening"] += 1
+                else:  # 0-6点
+                    time_periods["night"] += 1
+            
+            return time_periods
+            
+        except Exception as e:
+            logger.error(f"分析活跃时段失败 [{user_id}]: {e}")
+            return {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
     
     async def _analyze_feature_usage(
         self,
@@ -513,16 +742,75 @@ class UserProfileAnalyzer:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """分析功能使用（占位符方法）"""
-        return {
-            "most_used_features": ["对话", "模型切换", "历史记录"],
-            "feature_frequency": {
-                "chat": 30,
-                "model_switch": 15,
-                "history": 12,
-                "export": 3
+        """分析功能使用"""
+        try:
+            from ..models.database.activity import UserActivity
+            
+            # 查询功能使用活动
+            feature_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date,
+                UserActivity.activity_type == 'feature_usage'
+            ]
+            
+            feature_query = select(UserActivity).where(and_(*feature_conditions))
+            result = await db.execute(feature_query)
+            feature_activities = result.scalars().all()
+            
+            if not feature_activities:
+                return {
+                    "most_used_features": [],
+                    "feature_frequency": {}
+                }
+            
+            # 统计功能使用频率
+            feature_counts = {}
+            
+            for activity in feature_activities:
+                metadata = activity.metadata or {}
+                feature = metadata.get('feature')
+                
+                if feature:
+                    # 规范化功能名称
+                    normalized_feature = self._normalize_feature_name(feature)
+                    feature_counts[normalized_feature] = feature_counts.get(normalized_feature, 0) + 1
+            
+            if not feature_counts:
+                return {
+                    "most_used_features": [],
+                    "feature_frequency": {}
+                }
+            
+            # 按使用频率排序
+            most_used_features = sorted(
+                feature_counts.keys(),
+                key=lambda x: feature_counts[x],
+                reverse=True
+            )
+            
+            return {
+                "most_used_features": most_used_features,
+                "feature_frequency": feature_counts
             }
+            
+        except Exception as e:
+            logger.error(f"分析功能使用失败 [{user_id}]: {e}")
+            return {
+                "most_used_features": [],
+                "feature_frequency": {}
+            }
+    
+    def _normalize_feature_name(self, feature: str) -> str:
+        """规范化功能名称"""
+        feature_mapping = {
+            "chat": "对话",
+            "model_switch": "模型切换", 
+            "history": "历史记录",
+            "export": "导出功能",
+            "settings": "设置",
+            "profile": "个人资料"
         }
+        return feature_mapping.get(feature.lower(), feature)
     
     async def _generate_user_tags(
         self,
@@ -534,29 +822,46 @@ class UserProfileAnalyzer:
         """生成用户标签"""
         tags = []
         
-        # 基于活跃度的标签
-        if activity_stats["avg_activities_per_day"] > 3:
-            tags.append("高活跃用户")
-        elif activity_stats["avg_activities_per_day"] > 1:
-            tags.append("中等活跃用户")
-        else:
-            tags.append("低活跃用户")
+        # 使用analytics模块分析行为模式
+        from ..utils.analytics import analyze_behavior_patterns
+        
+        behavior_patterns = analyze_behavior_patterns(activity_stats)
+        
+        # 添加行为标签
+        if behavior_patterns.get("behavioral_tags"):
+            tags.extend(behavior_patterns["behavioral_tags"])
         
         # 基于模型使用的标签
-        favorite_model = model_usage["favorite_models"][0] if model_usage["favorite_models"] else None
-        if favorite_model:
-            tags.append(f"{favorite_model}偏好用户")
+        favorite_models = model_usage.get("favorite_models", [])
+        if favorite_models:
+            top_model = favorite_models[0]
+            tags.append(f"{top_model}偏好用户")
         
         # 基于对话模式的标签
-        avg_length = conversation_patterns["avg_messages_per_conversation"]
+        avg_length = conversation_patterns.get("avg_messages_per_conversation", 0)
         if avg_length > 15:
             tags.append("深度对话用户")
         elif avg_length > 5:
             tags.append("标准对话用户") 
-        else:
+        elif avg_length > 0:
             tags.append("简短对话用户")
         
-        return tags
+        # 基于功能使用的标签
+        most_used_features = feature_preferences.get("most_used_features", [])
+        if most_used_features:
+            primary_feature = most_used_features[0]
+            tags.append(f"{primary_feature}重度用户")
+        
+        # 基于AI模型多样性的标签
+        unique_models = model_usage.get("unique_models_used", 0)
+        if unique_models >= 5:
+            tags.append("多模型探索者")
+        elif unique_models >= 3:
+            tags.append("模型比较用户")
+        elif unique_models == 1:
+            tags.append("专一模型用户")
+        
+        return list(set(tags))  # 去重
     
     def _validate_preferences(
         self,
@@ -741,24 +1046,41 @@ class UserProfileAnalyzer:
         peer_comparison: Optional[Dict[str, Any]]
     ) -> str:
         """生成洞察摘要"""
-        summary_parts = []
-        
-        if current_analysis.get("status") == "success":
-            engagement = current_analysis.get("engagement_score", 0)
-            summary_parts.append(f"您的平台参与度评分为{engagement}分")
+        try:
+            from ..utils.analytics import generate_insights_text
             
-            if engagement > 80:
-                summary_parts.append("，表现优异")
-            elif engagement > 60:
-                summary_parts.append("，表现良好")
-            else:
-                summary_parts.append("，还有提升空间")
-        
-        if peer_comparison:
-            rank = peer_comparison.get("percentile_rank", 50)
-            summary_parts.append(f"，在同类用户中排名前{100-rank}%")
-        
-        return "".join(summary_parts) + "。"
+            if current_analysis.get("status") != "success":
+                return "由于数据不足，无法生成完整的用户洞察。"
+            
+            # 获取必要的数据
+            user_segment = current_analysis.get("user_segment", {})
+            behavior_patterns = current_analysis.get("activity_stats", {})
+            engagement_score = current_analysis.get("engagement_score", 0)
+            
+            # 使用analytics模块生成洞察文本
+            insights_text = generate_insights_text(
+                user_segment, 
+                {"usage_regularity": behavior_patterns.get("usage_regularity", "unknown")},
+                engagement_score
+            )
+            
+            # 添加同类用户比较信息
+            if peer_comparison:
+                rank = peer_comparison.get("percentile_rank", 50)
+                insights_text += f" 在同类用户中排名前{100-rank}%。"
+            
+            # 添加趋势信息
+            activity_trend = trends.get("activity_trend", "stable")
+            if activity_trend == "increasing":
+                insights_text += " 您的使用活跃度呈上升趋势。"
+            elif activity_trend == "decreasing":
+                insights_text += " 建议保持更规律的使用习惯。"
+            
+            return insights_text
+            
+        except Exception as e:
+            logger.error(f"生成洞察摘要失败: {e}")
+            return "洞察摘要生成过程中发生错误，请稍后重试。"
 
 # 全局用户画像分析器实例
 profile_analyzer = UserProfileAnalyzer()

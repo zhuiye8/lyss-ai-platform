@@ -911,18 +911,76 @@ class UserManager:
         event_data: Dict[str, Any],
         db: AsyncSession
     ):
-        """记录用户事件（占位符方法）"""
-        # 这里应该调用activity服务记录事件
-        # 或者直接写入user_events表
-        pass
+        """记录用户事件"""
+        try:
+            from ..activities.tracker import activity_tracker
+            
+            # 使用活动追踪器记录事件
+            await activity_tracker.track_activity(
+                user_id=user_id,
+                activity_type=event_type,
+                metadata=event_data,
+                tenant_id=event_data.get("tenant_id")
+            )
+            
+            logger.debug(f"用户事件记录成功: {user_id} - {event_type}")
+            
+        except Exception as e:
+            logger.error(f"记录用户事件失败 [{user_id}]: {e}")
+            # 不抛出异常，避免影响主流程
     
     async def _get_user_profile(self, user_id: str, db: AsyncSession) -> Dict[str, Any]:
-        """获取用户画像（占位符方法）"""
-        return {}
+        """获取用户画像"""
+        try:
+            from ..profiles.analyzer import profile_analyzer
+            
+            # 获取用户行为分析结果
+            behavior_analysis = await profile_analyzer.analyze_user_behavior(
+                user_id, period="monthly", include_trends=False, db=db
+            )
+            
+            if behavior_analysis.get("status") == "success":
+                return {
+                    "engagement_score": behavior_analysis.get("engagement_score", 0),
+                    "user_segment": behavior_analysis.get("user_segment", {}),
+                    "user_tags": behavior_analysis.get("user_tags", []),
+                    "activity_summary": behavior_analysis.get("activity_stats", {}),
+                    "model_preferences": behavior_analysis.get("model_usage", {}),
+                    "feature_preferences": behavior_analysis.get("feature_preferences", {}),
+                    "analyzed_at": behavior_analysis.get("analyzed_at")
+                }
+            else:
+                return {"status": "insufficient_data", "message": "用户数据不足以生成画像"}
+                
+        except Exception as e:
+            logger.error(f"获取用户画像失败 [{user_id}]: {e}")
+            return {"error": str(e)}
     
     async def _get_user_activity_summary(self, user_id: str, db: AsyncSession) -> Dict[str, Any]:
-        """获取用户活动摘要（占位符方法）"""
-        return {}
+        """获取用户活动摘要"""
+        try:
+            from ..activities.tracker import activity_tracker
+            
+            # 获取30天的活动摘要
+            activity_summary = await activity_tracker.get_user_activity_summary(
+                user_id, days=30, include_details=False, db=db
+            )
+            
+            if "error" not in activity_summary:
+                return {
+                    "basic_stats": activity_summary.get("basic_stats", {}),
+                    "daily_distribution": activity_summary.get("daily_distribution", {}),
+                    "activity_types": activity_summary.get("activity_types", {}),
+                    "hourly_pattern": activity_summary.get("hourly_pattern", {}),
+                    "summary_period": "30天",
+                    "generated_at": activity_summary.get("summary_generated_at")
+                }
+            else:
+                return {"error": activity_summary.get("error")}
+                
+        except Exception as e:
+            logger.error(f"获取用户活动摘要失败 [{user_id}]: {e}")
+            return {"error": str(e)}
     
     async def _check_update_permission(
         self,

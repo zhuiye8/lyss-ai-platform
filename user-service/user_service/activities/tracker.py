@@ -647,14 +647,53 @@ class UserActivityTracker:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """获取基础活动统计（占位符方法）"""
-        # 这里应该查询实际数据库
-        return {
-            "total_activities": 150,
-            "active_days": 25,
-            "avg_activities_per_day": 6.0,
-            "last_activity": datetime.utcnow().isoformat()
-        }
+        """获取基础活动统计"""
+        try:
+            # 基础统计查询条件
+            conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            # 总活动数
+            total_query = select(func.count(UserActivity.id)).where(and_(*conditions))
+            total_result = await db.execute(total_query)
+            total_activities = total_result.scalar() or 0
+            
+            # 活跃天数
+            active_days_query = select(
+                func.count(func.distinct(func.date(UserActivity.created_at)))
+            ).where(and_(*conditions))
+            active_days_result = await db.execute(active_days_query)
+            active_days = active_days_result.scalar() or 0
+            
+            # 最后活动时间
+            last_activity_query = select(
+                func.max(UserActivity.created_at)
+            ).where(and_(*conditions))
+            last_activity_result = await db.execute(last_activity_query)
+            last_activity = last_activity_result.scalar()
+            
+            # 计算平均每日活动
+            avg_activities_per_day = (
+                total_activities / max(active_days, 1) if active_days > 0 else 0
+            )
+            
+            return {
+                "total_activities": total_activities,
+                "active_days": active_days,
+                "avg_activities_per_day": round(avg_activities_per_day, 2),
+                "last_activity": last_activity.isoformat() if last_activity else None
+            }
+            
+        except Exception as e:
+            logger.error(f"获取基础活动统计失败 [{user_id}]: {e}")
+            return {
+                "total_activities": 0,
+                "active_days": 0,
+                "avg_activities_per_day": 0.0,
+                "last_activity": None
+            }
     
     async def _get_daily_activity_distribution(
         self,
@@ -662,16 +701,33 @@ class UserActivityTracker:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, int]:
-        """获取每日活动分布（占位符方法）"""
-        return {
-            "2025-01-15": 12,
-            "2025-01-16": 8,
-            "2025-01-17": 15,
-            "2025-01-18": 10,
-            "2025-01-19": 18,
-            "2025-01-20": 14,
-            "2025-01-21": 20
-        }
+        """获取每日活动分布"""
+        try:
+            conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            # 按日期分组统计活动数
+            daily_query = select(
+                func.date(UserActivity.created_at).label('activity_date'),
+                func.count(UserActivity.id).label('activity_count')
+            ).where(and_(*conditions)).group_by(func.date(UserActivity.created_at))
+            
+            result = await db.execute(daily_query)
+            daily_data = result.fetchall()
+            
+            # 转换为字典格式
+            daily_distribution = {}
+            for row in daily_data:
+                date_str = row.activity_date.strftime('%Y-%m-%d')
+                daily_distribution[date_str] = row.activity_count
+            
+            return daily_distribution
+            
+        except Exception as e:
+            logger.error(f"获取每日活动分布失败 [{user_id}]: {e}")
+            return {}
     
     async def _get_activity_type_stats(
         self,
@@ -679,13 +735,32 @@ class UserActivityTracker:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, int]:
-        """获取活动类型统计（占位符方法）"""
-        return {
-            "chat_message": 45,
-            "login": 12,
-            "model_usage": 38,
-            "feature_usage": 22
-        }
+        """获取活动类型统计"""
+        try:
+            conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            # 按活动类型分组统计
+            type_query = select(
+                UserActivity.activity_type,
+                func.count(UserActivity.id).label('type_count')
+            ).where(and_(*conditions)).group_by(UserActivity.activity_type)
+            
+            result = await db.execute(type_query)
+            type_data = result.fetchall()
+            
+            # 转换为字典格式
+            activity_types = {}
+            for row in type_data:
+                activity_types[row.activity_type] = row.type_count
+            
+            return activity_types
+            
+        except Exception as e:
+            logger.error(f"获取活动类型统计失败 [{user_id}]: {e}")
+            return {}
     
     async def _get_hourly_activity_pattern(
         self,
@@ -693,10 +768,33 @@ class UserActivityTracker:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[int, int]:
-        """获取小时活动模式（占位符方法）"""
-        return {
-            9: 8, 10: 12, 11: 15, 14: 18, 15: 20, 16: 16, 19: 10, 20: 8, 21: 5
-        }
+        """获取小时活动模式"""
+        try:
+            conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date
+            ]
+            
+            # 按小时分组统计活动
+            hourly_query = select(
+                func.extract('hour', UserActivity.created_at).label('activity_hour'),
+                func.count(UserActivity.id).label('hour_count')
+            ).where(and_(*conditions)).group_by(func.extract('hour', UserActivity.created_at))
+            
+            result = await db.execute(hourly_query)
+            hourly_data = result.fetchall()
+            
+            # 转换为字典格式，确保小时为整数
+            hourly_pattern = {}
+            for row in hourly_data:
+                hour = int(row.activity_hour)
+                hourly_pattern[hour] = row.hour_count
+            
+            return hourly_pattern
+            
+        except Exception as e:
+            logger.error(f"获取小时活动模式失败 [{user_id}]: {e}")
+            return {}
     
     async def _get_recent_activities(
         self,
@@ -704,14 +802,47 @@ class UserActivityTracker:
         limit: int,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """获取最近活动（占位符方法）"""
-        return [
-            {
-                "activity_type": "chat_message",
-                "created_at": datetime.utcnow().isoformat(),
-                "metadata": {"model": "gpt-4", "tokens": 150}
-            }
-        ]
+        """获取最近活动"""
+        try:
+            # 查询最近的活动记录
+            recent_query = select(UserActivity).where(
+                UserActivity.user_id == user_id
+            ).order_by(desc(UserActivity.created_at)).limit(limit)
+            
+            result = await db.execute(recent_query)
+            activities = result.scalars().all()
+            
+            # 转换为字典格式
+            recent_activities = []
+            for activity in activities:
+                activity_data = {
+                    "activity_type": activity.activity_type,
+                    "created_at": activity.created_at.isoformat(),
+                    "metadata": activity.metadata or {}
+                }
+                
+                # 添加简化的描述
+                if activity.activity_type == "chat_message":
+                    model = activity.metadata.get('model', '未知模型') if activity.metadata else '未知模型'
+                    activity_data["description"] = f"使用{model}进行对话"
+                elif activity.activity_type == "login":
+                    activity_data["description"] = "用户登录"
+                elif activity.activity_type == "model_usage":
+                    model = activity.metadata.get('model', '未知模型') if activity.metadata else '未知模型'
+                    activity_data["description"] = f"调用{model}模型"
+                elif activity.activity_type == "feature_usage":
+                    feature = activity.metadata.get('feature', '未知功能') if activity.metadata else '未知功能'
+                    activity_data["description"] = f"使用{feature}功能"
+                else:
+                    activity_data["description"] = f"{activity.activity_type}活动"
+                
+                recent_activities.append(activity_data)
+            
+            return recent_activities
+            
+        except Exception as e:
+            logger.error(f"获取最近活动失败 [{user_id}]: {e}")
+            return []
     
     async def _get_anomaly_summary(
         self,
@@ -719,12 +850,57 @@ class UserActivityTracker:
         start_date: datetime,
         db: AsyncSession
     ) -> Dict[str, Any]:
-        """获取异常摘要（占位符方法）"""
-        return {
-            "total_anomalies": 2,
-            "anomaly_types": ["unusual_login_location", "high_activity_burst"],
-            "severity_distribution": {"low": 1, "medium": 1, "high": 0}
-        }
+        """获取异常摘要"""
+        try:
+            # 查询包含异常标记的活动
+            anomaly_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_date,
+                UserActivity.metadata.op('?')('anomaly')  # JSON包含anomaly字段
+            ]
+            
+            anomaly_query = select(UserActivity).where(and_(*anomaly_conditions))
+            result = await db.execute(anomaly_query)
+            anomaly_activities = result.scalars().all()
+            
+            if not anomaly_activities:
+                return {
+                    "total_anomalies": 0,
+                    "anomaly_types": [],
+                    "severity_distribution": {"low": 0, "medium": 0, "high": 0}
+                }
+            
+            # 分析异常类型和严重程度
+            anomaly_types = []
+            severity_counts = {"low": 0, "medium": 0, "high": 0}
+            
+            for activity in anomaly_activities:
+                metadata = activity.metadata or {}
+                anomaly_info = metadata.get('anomaly', {})
+                
+                if anomaly_info:
+                    anomaly_type = anomaly_info.get('type', 'unknown')
+                    severity = anomaly_info.get('severity', 'low')
+                    
+                    if anomaly_type not in anomaly_types:
+                        anomaly_types.append(anomaly_type)
+                    
+                    if severity in severity_counts:
+                        severity_counts[severity] += 1
+            
+            return {
+                "total_anomalies": len(anomaly_activities),
+                "anomaly_types": anomaly_types,
+                "severity_distribution": severity_counts
+            }
+            
+        except Exception as e:
+            logger.error(f"获取异常摘要失败 [{user_id}]: {e}")
+            return {
+                "total_anomalies": 0,
+                "anomaly_types": [],
+                "severity_distribution": {"low": 0, "medium": 0, "high": 0}
+            }
     
     async def _detect_login_anomalies(
         self,
@@ -732,8 +908,68 @@ class UserActivityTracker:
         start_time: datetime,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """检测登录异常（占位符方法）"""
-        return []
+        """检测登录异常"""
+        try:
+            # 查询登录活动
+            login_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_time,
+                UserActivity.activity_type == 'login'
+            ]
+            
+            login_query = select(UserActivity).where(and_(*login_conditions))
+            result = await db.execute(login_query)
+            login_activities = result.scalars().all()
+            
+            anomalies = []
+            
+            if len(login_activities) < 2:
+                return anomalies
+            
+            # 分析IP地址变化
+            ip_addresses = set()
+            locations = set()
+            
+            for activity in login_activities:
+                if activity.ip_address:
+                    ip_addresses.add(activity.ip_address)
+                
+                metadata = activity.metadata or {}
+                location = metadata.get('location', {})
+                if location.get('country'):
+                    locations.add(location['country'])
+            
+            # 检测异常IP或地理位置
+            if len(ip_addresses) > 3:
+                anomalies.append({
+                    "type": "multiple_ip_addresses",
+                    "severity": "medium",
+                    "description": f"检测到{len(ip_addresses)}个不同IP地址登录",
+                    "details": {"ip_count": len(ip_addresses)}
+                })
+            
+            if len(locations) > 2:
+                anomalies.append({
+                    "type": "unusual_login_location",
+                    "severity": "high",
+                    "description": f"检测到来自{len(locations)}个不同国家的登录",
+                    "details": {"countries": list(locations)}
+                })
+            
+            # 检测登录频率异常
+            if len(login_activities) > 20:  # 时间窗口内登录次数过多
+                anomalies.append({
+                    "type": "excessive_login_frequency",
+                    "severity": "medium",
+                    "description": f"登录频率异常（{len(login_activities)}次）",
+                    "details": {"login_count": len(login_activities)}
+                })
+            
+            return anomalies
+            
+        except Exception as e:
+            logger.error(f"检测登录异常失败 [{user_id}]: {e}")
+            return []
     
     async def _detect_usage_anomalies(
         self,
@@ -741,8 +977,68 @@ class UserActivityTracker:
         start_time: datetime,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """检测使用异常（占位符方法）"""
-        return []
+        """检测使用异常"""
+        try:
+            # 查询所有活动
+            activity_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_time
+            ]
+            
+            activity_query = select(UserActivity).where(and_(*activity_conditions))
+            result = await db.execute(activity_query)
+            activities = result.scalars().all()
+            
+            anomalies = []
+            
+            if not activities:
+                return anomalies
+            
+            # 按小时分组分析活动密度
+            hourly_counts = {}
+            for activity in activities:
+                hour = activity.created_at.hour
+                hourly_counts[hour] = hourly_counts.get(hour, 0) + 1
+            
+            # 检测异常活跃时段
+            avg_hourly = sum(hourly_counts.values()) / max(len(hourly_counts), 1)
+            for hour, count in hourly_counts.items():
+                if count > avg_hourly * 3:  # 超过平均值3倍
+                    anomalies.append({
+                        "type": "unusual_activity_burst",
+                        "severity": "medium",
+                        "description": f"{hour}点活动异常密集（{count}次）",
+                        "details": {"hour": hour, "count": count, "average": round(avg_hourly, 1)}
+                    })
+            
+            # 检测模型使用异常
+            model_activities = [a for a in activities if a.activity_type == 'model_usage']
+            if len(model_activities) > 100:  # 模型调用过多
+                anomalies.append({
+                    "type": "excessive_model_usage",
+                    "severity": "high",
+                    "description": f"模型使用频率异常（{len(model_activities)}次）",
+                    "details": {"model_calls": len(model_activities)}
+                })
+            
+            # 检测总活动量异常
+            total_activities = len(activities)
+            time_span_hours = (datetime.utcnow() - start_time).total_seconds() / 3600
+            activity_rate = total_activities / max(time_span_hours, 1)
+            
+            if activity_rate > 10:  # 每小时超过10次活动
+                anomalies.append({
+                    "type": "high_activity_rate",
+                    "severity": "medium",
+                    "description": f"活动频率过高（每小时{activity_rate:.1f}次）",
+                    "details": {"rate_per_hour": round(activity_rate, 1)}
+                })
+            
+            return anomalies
+            
+        except Exception as e:
+            logger.error(f"检测使用异常失败 [{user_id}]: {e}")
+            return []
     
     async def _detect_location_anomalies(
         self,
@@ -750,8 +1046,75 @@ class UserActivityTracker:
         start_time: datetime,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """检测地理位置异常（占位符方法）"""
-        return []
+        """检测地理位置异常"""
+        try:
+            # 查询有IP地址的活动
+            location_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_time,
+                UserActivity.ip_address.isnot(None)
+            ]
+            
+            location_query = select(UserActivity).where(and_(*location_conditions))
+            result = await db.execute(location_query)
+            activities_with_location = result.scalars().all()
+            
+            anomalies = []
+            
+            if len(activities_with_location) < 2:
+                return anomalies
+            
+            # 分析地理位置变化
+            locations = []
+            for activity in activities_with_location:
+                metadata = activity.metadata or {}
+                location = metadata.get('location', {})
+                if location.get('country'):
+                    locations.append({
+                        'country': location.get('country'),
+                        'city': location.get('city'),
+                        'timestamp': activity.created_at
+                    })
+            
+            if len(locations) < 2:
+                return anomalies
+            
+            # 检测快速地理位置变化
+            locations.sort(key=lambda x: x['timestamp'])
+            for i in range(1, len(locations)):
+                current = locations[i]
+                previous = locations[i-1]
+                
+                # 如果国家不同且时间间隔很短
+                if (current['country'] != previous['country'] and 
+                    (current['timestamp'] - previous['timestamp']).total_seconds() < 3600):  # 1小时内
+                    
+                    anomalies.append({
+                        "type": "impossible_travel",
+                        "severity": "high",
+                        "description": f"短时间内从{previous['country']}切换到{current['country']}",
+                        "details": {
+                            "from_country": previous['country'],
+                            "to_country": current['country'],
+                            "time_diff_minutes": int((current['timestamp'] - previous['timestamp']).total_seconds() / 60)
+                        }
+                    })
+            
+            # 检测来自多个国家的访问
+            unique_countries = set(loc['country'] for loc in locations)
+            if len(unique_countries) > 2:
+                anomalies.append({
+                    "type": "multiple_countries",
+                    "severity": "medium",
+                    "description": f"来自{len(unique_countries)}个不同国家的访问",
+                    "details": {"countries": list(unique_countries)}
+                })
+            
+            return anomalies
+            
+        except Exception as e:
+            logger.error(f"检测地理位置异常失败 [{user_id}]: {e}")
+            return []
     
     async def _detect_time_anomalies(
         self,
@@ -759,8 +1122,89 @@ class UserActivityTracker:
         start_time: datetime,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """检测时间异常（占位符方法）"""
-        return []
+        """检测时间异常"""
+        try:
+            # 查询活动记录
+            time_conditions = [
+                UserActivity.user_id == user_id,
+                UserActivity.created_at >= start_time
+            ]
+            
+            time_query = select(UserActivity).where(and_(*time_conditions))
+            result = await db.execute(time_query)
+            activities = result.scalars().all()
+            
+            anomalies = []
+            
+            if not activities:
+                return anomalies
+            
+            # 分析活动时间模式
+            hourly_pattern = {}
+            for activity in activities:
+                hour = activity.created_at.hour
+                hourly_pattern[hour] = hourly_pattern.get(hour, 0) + 1
+            
+            # 检测深夜异常活动（凌晨2-5点）
+            night_hours = [2, 3, 4, 5]
+            night_activities = sum(hourly_pattern.get(hour, 0) for hour in night_hours)
+            total_activities = len(activities)
+            
+            if night_activities > 0 and total_activities > 10:
+                night_ratio = night_activities / total_activities
+                if night_ratio > 0.3:  # 超过30%的活动在深夜
+                    anomalies.append({
+                        "type": "unusual_night_activity",
+                        "severity": "medium",
+                        "description": f"深夜活动异常（{night_activities}次，占比{night_ratio:.1%}）",
+                        "details": {
+                            "night_activities": night_activities,
+                            "night_ratio": round(night_ratio, 3)
+                        }
+                    })
+            
+            # 检测连续长时间活动
+            activities.sort(key=lambda x: x.created_at)
+            continuous_sessions = []
+            session_start = None
+            
+            for i, activity in enumerate(activities):
+                if i == 0:
+                    session_start = activity.created_at
+                    continue
+                
+                # 如果与前一个活动间隔超过30分钟，认为是新会话
+                time_gap = (activity.created_at - activities[i-1].created_at).total_seconds()
+                if time_gap > 1800:  # 30分钟
+                    if session_start:
+                        session_duration = (activities[i-1].created_at - session_start).total_seconds()
+                        if session_duration > 14400:  # 4小时以上
+                            continuous_sessions.append(session_duration / 3600)  # 转换为小时
+                    session_start = activity.created_at
+            
+            # 检查最后一个会话
+            if session_start and activities:
+                session_duration = (activities[-1].created_at - session_start).total_seconds()
+                if session_duration > 14400:
+                    continuous_sessions.append(session_duration / 3600)
+            
+            if continuous_sessions:
+                max_session = max(continuous_sessions)
+                anomalies.append({
+                    "type": "excessive_session_duration",
+                    "severity": "medium",
+                    "description": f"连续使用时间过长（最长{max_session:.1f}小时）",
+                    "details": {
+                        "max_session_hours": round(max_session, 1),
+                        "long_sessions_count": len(continuous_sessions)
+                    }
+                })
+            
+            return anomalies
+            
+        except Exception as e:
+            logger.error(f"检测时间异常失败 [{user_id}]: {e}")
+            return []
     
     def get_tracker_stats(self) -> Dict[str, Any]:
         """获取追踪器统计"""

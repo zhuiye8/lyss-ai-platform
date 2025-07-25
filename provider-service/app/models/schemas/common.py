@@ -59,12 +59,12 @@ class PaginationRequest(BaseModel):
     page: int = Field(1, ge=1, le=1000, description="页码，从1开始")
     size: int = Field(20, ge=1, le=100, description="每页大小，最大100")
     sort_by: Optional[str] = Field(None, description="排序字段")
-    sort_order: Optional[str] = Field("desc", regex="^(asc|desc)$", description="排序方向")
+    sort_order: Optional[str] = Field("desc", pattern="^(asc|desc)$", description="排序方向")
 
 
 class StatusRequest(BaseModel):
     """状态变更请求模型"""
-    status: str = Field(..., regex="^(active|inactive|disabled)$", description="状态值")
+    status: str = Field(..., pattern="^(active|inactive|disabled)$", description="状态值")
 
 
 class HealthCheckResponse(BaseModel):
@@ -93,7 +93,7 @@ class MetricsResponse(BaseModel):
 class BatchOperationRequest(BaseModel):
     """批量操作请求模型"""
     ids: List[int] = Field(..., min_items=1, max_items=100, description="操作的ID列表")
-    operation: str = Field(..., regex="^(enable|disable|delete)$", description="操作类型")
+    operation: str = Field(..., pattern="^(enable|disable|delete)$", description="操作类型")
 
 
 class BatchOperationResponse(BaseModel):

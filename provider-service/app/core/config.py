@@ -12,7 +12,8 @@ Modified: 2025-01-21
 import os
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -25,18 +26,30 @@ class Settings(BaseSettings):
     debug: bool = Field(False, env="DEBUG")
     log_level: str = Field("INFO", env="LOG_LEVEL")
     
-    # 服务配置
+    # 服务配置 (添加兼容的环境变量)
     host: str = Field("0.0.0.0", env="PROVIDER_SERVICE_HOST")
     port: int = Field(8003, env="PROVIDER_SERVICE_PORT")
+    provider_service_host: str = Field("0.0.0.0", env="PROVIDER_SERVICE_HOST")
+    provider_service_port: int = Field(8003, env="PROVIDER_SERVICE_PORT")
     
     # 数据库配置
     database_url: str = Field(
-        "postgresql://lyss:lyss123@localhost:5433/lyss_provider_db", 
+        "postgresql://lyss:lyss123@localhost:5433/lyss_db", 
         env="PROVIDER_SERVICE_DATABASE_URL"
     )
     database_pool_size: int = Field(20, env="DB_POOL_SIZE")
     database_max_overflow: int = Field(30, env="DB_MAX_OVERFLOW")
     database_echo: bool = Field(False, env="DB_ECHO")
+    
+    # 兼容的数据库环境变量
+    db_host: str = Field("localhost", env="DB_HOST")
+    db_port: int = Field(5433, env="DB_PORT")
+    db_user: str = Field("lyss", env="DB_USER")
+    db_password: str = Field("lyss123", env="DB_PASSWORD")
+    db_name: str = Field("lyss_db", env="DB_NAME")
+    db_pool_size: int = Field(20, env="DB_POOL_SIZE")
+    db_max_overflow: int = Field(30, env="DB_MAX_OVERFLOW")
+    db_echo: bool = Field(False, env="DB_ECHO")
     
     # Redis配置
     redis_url: str = Field("redis://localhost:6380/2", env="PROVIDER_SERVICE_REDIS_URL")
@@ -50,9 +63,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256", env="JWT_ALGORITHM")
     jwt_expire_minutes: int = Field(1440, env="JWT_EXPIRE_MINUTES")
     
+    # 兼容的JWT环境变量
+    provider_service_jwt_secret: str = Field("your-super-secret-jwt-key-min-32-chars", env="PROVIDER_SERVICE_JWT_SECRET")
+    
     # 加密配置
     encryption_key: str = Field("your-32-char-encryption-key-here", env="PROVIDER_SERVICE_ENCRYPTION_KEY")
     encryption_algorithm: str = Field("AES-256-GCM", env="ENCRYPTION_ALGORITHM")
+    
+    # 兼容的加密环境变量
+    provider_service_encryption_key: str = Field("your-32-char-encryption-key-here", env="PROVIDER_SERVICE_ENCRYPTION_KEY")
     
     # CORS配置
     cors_origins: List[str] = Field(
@@ -90,6 +109,10 @@ class Settings(BaseSettings):
         "requests_per_hour": 500
     }, env="RATE_LIMIT_PER_IP")
     rate_limit_storage_url: str = Field("redis://localhost:6380/3", env="RATE_LIMIT_STORAGE_URL")
+    
+    # 兼容的限流环境变量
+    rate_limit_requests: int = Field(1000, env="RATE_LIMIT_REQUESTS")
+    rate_limit_window: int = Field(60, env="RATE_LIMIT_WINDOW")
     
     # Channel健康检查配置
     health_check_interval: int = Field(60, env="HEALTH_CHECK_INTERVAL")
@@ -161,6 +184,11 @@ class Settings(BaseSettings):
     # 文件配置
     max_request_size: int = Field(10485760, env="MAX_REQUEST_SIZE")  # 10MB
     max_upload_size: int = Field(52428800, env="MAX_UPLOAD_SIZE")   # 50MB
+    
+    # AI供应商API密钥配置
+    deepseek_api_key: Optional[str] = Field(None, env="DEEPSEEK_API_KEY")
+    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
+    anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
     
     class Config:
         env_file = ".env"

@@ -62,7 +62,7 @@ class ChannelUpdateRequest(BaseModel):
     weight: Optional[int] = Field(None, ge=1, le=1000, description="负载均衡权重")
     max_requests_per_minute: Optional[int] = Field(None, ge=1, le=10000, description="每分钟最大请求数")
     config: Optional[Dict[str, Any]] = Field(None, description="其他配置")
-    status: Optional[str] = Field(None, regex="^(active|inactive|disabled)$", description="状态")
+    status: Optional[str] = Field(None, pattern="^(active|inactive|disabled)$", description="状态")
 
 
 class ChannelResponse(BaseModel):
@@ -151,7 +151,7 @@ class ChannelUsageRequest(BaseModel):
     """Channel使用统计请求"""
     start_date: Optional[datetime] = Field(None, description="开始日期")
     end_date: Optional[datetime] = Field(None, description="结束日期")
-    group_by: str = Field("day", regex="^(hour|day|week|month)$", description="分组方式")
+    group_by: str = Field("day", pattern="^(hour|day|week|month)$", description="分组方式")
     
     @validator('end_date')
     def validate_date_range(cls, v, values):
