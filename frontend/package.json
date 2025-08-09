@@ -20,7 +20,7 @@
     "react-router-dom": "^6.8.1",
     "antd": "^5.12.8",
     "@ant-design/icons": "^5.2.6",
-    "@ant-design/x": "^1.0.0",
+    "@ant-design/x": "^1.5.0",
     "zustand": "^4.4.7",
     "axios": "^1.6.4",
     "dayjs": "^1.11.10"
