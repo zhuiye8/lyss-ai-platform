@@ -10,7 +10,7 @@ aiohttp==3.8.6
 # 认证和安全
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+python-multipart==0.0.22
 pyjwt
 
 # 数据验证和序列化
